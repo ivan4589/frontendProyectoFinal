@@ -5,6 +5,7 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { ProvidersPage } from '../features/providers/ProvidersPage';
+import { ClientsPage } from '../features/clients/ClientsPage';
 import { useAuth } from '../features/auth/AuthContext';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -58,7 +59,7 @@ export function AppRouter() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="clients" element={<PlaceholderPage title="Clientes" />} />
+        <Route path="clients" element={<ClientsPage />} />
         <Route path="products" element={<PlaceholderPage title="Productos" />} />
         <Route path="providers" element={<ProvidersPage />} />
         <Route path="purchases" element={<PlaceholderPage title="Compras" />} />
