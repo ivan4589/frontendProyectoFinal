@@ -19,6 +19,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
@@ -34,6 +35,11 @@ const menuItems = [
     text: 'Clientes',
     path: '/clients',
     icon: <PeopleIcon />,
+  },
+  {
+    text: 'Proveedores',
+    path: '/providers',
+    icon: <LocalShippingIcon />,
   },
   {
     text: 'Productos',
@@ -91,6 +97,7 @@ export function MainLayout() {
               <Typography variant="body2" sx={{ lineHeight: 1.1 }}>
                 {userLabel}
               </Typography>
+
               <Typography variant="caption" sx={{ opacity: 0.8 }}>
                 {user?.role || 'Sin rol'}
               </Typography>
