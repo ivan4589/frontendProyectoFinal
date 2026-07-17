@@ -8,7 +8,13 @@ import {
 } from 'react';
 import { loginRequest } from '../../api/auth.api';
 import type { AuthUser, LoginRequest } from '../../types/auth.types';
-import { clearToken, decodeToken, getToken, isTokenExpired, saveToken } from './authStorage';
+import {
+  clearToken,
+  decodeToken,
+  getToken,
+  isTokenExpired,
+  saveToken,
+} from './authStorage';
 
 interface AuthContextValue {
   token: string | null;
@@ -67,6 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!receivedToken) {
       throw new Error('El servidor no devolvió un token válido');
+    }
+
+    const decoded = decodeToken(receivedToken);
+
+    if (!decoded) {
+      throw new Error('El token recibido no es válido');
     }
 
     saveToken(receivedToken, remember);

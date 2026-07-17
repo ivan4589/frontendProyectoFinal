@@ -24,13 +24,16 @@ export function clearToken() {
 
 export function decodeToken(token: string): DecodedToken | null {
   try {
-    const payload = token.split('.')[1];
+    const parts = token.split('.');
 
-    if (!payload) {
+    if (parts.length !== 3) {
       return null;
     }
 
+    const payload = parts[1];
+
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+
     const jsonPayload = decodeURIComponent(
       window
         .atob(base64)
@@ -50,7 +53,11 @@ export function decodeToken(token: string): DecodedToken | null {
 export function isTokenExpired(token: string) {
   const decoded = decodeToken(token);
 
-  if (!decoded?.exp) {
+  if (!decoded) {
+    return true;
+  }
+
+  if (!decoded.exp) {
     return false;
   }
 

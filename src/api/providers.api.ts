@@ -5,9 +5,35 @@ import type {
   UpdateProviderRequest,
 } from '../types/provider.types';
 
+function normalizeProvidersResponse(data: unknown): Provider[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (
+    data &&
+    typeof data === 'object' &&
+    'providers' in data &&
+    Array.isArray((data as { providers: unknown }).providers)
+  ) {
+    return (data as { providers: Provider[] }).providers;
+  }
+
+  if (
+    data &&
+    typeof data === 'object' &&
+    'data' in data &&
+    Array.isArray((data as { data: unknown }).data)
+  ) {
+    return (data as { data: Provider[] }).data;
+  }
+
+  return [];
+}
+
 export async function getProviders(): Promise<Provider[]> {
-  const response = await api.get<Provider[]>('/providers');
-  return response.data;
+  const response = await api.get<unknown>('/providers');
+  return normalizeProvidersResponse(response.data);
 }
 
 export async function getProviderById(id: string): Promise<Provider> {
