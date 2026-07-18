@@ -8,9 +8,14 @@ import {
   DialogTitle,
   MenuItem,
   TextField,
+  Typography,
 } from '@mui/material';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ImageIcon from '@mui/icons-material/Image';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { uploadProductImage } from '../../api/uploads.api';
+import { getImageUrl } from '../../utils/getImageUrl';
 import type { Provider } from '../../types/provider.types';
 import type {
   Category,
@@ -38,10 +43,10 @@ interface ProductFormValues {
   categoryId: string;
   subCategoryId: string;
   weight: string;
-  purchasePrice: number;
-  priceNormal: number;
-  priceCamino: number;
-  priceEspecial: number;
+  purchasePrice: number | '';
+  priceNormal: number | '';
+  priceCamino: number | '';
+  priceEspecial: number | '';
   priceMayorista: number | '';
   minQuantityWholesale: number | '';
   stock: number | '';
@@ -49,12 +54,31 @@ interface ProductFormValues {
   unit: string;
   reserveQuantity: number | '';
   additionalInfo: string;
-  imageUrl: string;
+}
+
+const decimalInputProps = {
+  min: 0,
+  step: '0.01',
+};
+
+const integerInputProps = {
+  min: 0,
+  step: '1',
+};
+
+function numberOrZero(value: number | '') {
+  if (value === '') return 0;
+
+  const parsed = Number(value);
+
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function numberOrUndefined(value: number | '') {
   if (value === '') return undefined;
+
   const parsed = Number(value);
+
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
@@ -70,6 +94,10 @@ export function ProductFormDialog({
   onSubmit,
 }: ProductFormDialogProps) {
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [currentImageUrl, setCurrentImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const {
     register,
@@ -96,7 +124,6 @@ export function ProductFormDialog({
       unit: 'UNIDAD',
       reserveQuantity: 0,
       additionalInfo: '',
-      imageUrl: '',
     },
   });
 
@@ -128,52 +155,106 @@ export function ProductFormDialog({
         unit: product?.unit || 'UNIDAD',
         reserveQuantity: product?.reserveQuantity ?? 0,
         additionalInfo: product?.additionalInfo || '',
-        imageUrl: product?.imageUrl || '',
       });
 
+      setCurrentImageUrl(product?.imageUrl || '');
+      setImagePreview(product?.imageUrl ? getImageUrl(product.imageUrl) : '');
+      setSelectedImageFile(null);
       setLocalError(null);
+      setUploadingImage(false);
     }
   }, [open, product, reset]);
 
-  const submitForm = (values: ProductFormValues) => {
+  const handleSelectImage = (file?: File) => {
     setLocalError(null);
 
-    if (!values.providerId) {
-      setLocalError('Debes seleccionar un proveedor');
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+    if (!allowedTypes.includes(file.type)) {
+      setLocalError('Formato no permitido. Usa JPG, JPEG, PNG o WEBP.');
       return;
     }
 
-    if (!values.categoryId) {
-      setLocalError('Debes seleccionar una categoría');
+    if (file.size > 2 * 1024 * 1024) {
+      setLocalError('La imagen no debe superar los 2MB.');
       return;
     }
 
-    const data: CreateProductRequest = {
-      name: values.name.trim(),
-      description: values.description.trim() || undefined,
-      providerId: values.providerId,
-      categoryId: values.categoryId,
-      subCategoryId: values.subCategoryId || undefined,
-      weight: values.weight.trim() || undefined,
-      purchasePrice: Number(values.purchasePrice),
-      priceNormal: Number(values.priceNormal),
-      priceCamino: Number(values.priceCamino),
-      priceEspecial: Number(values.priceEspecial),
-      priceMayorista: numberOrUndefined(values.priceMayorista),
-      minQuantityWholesale: numberOrUndefined(values.minQuantityWholesale),
-      stock: numberOrUndefined(values.stock),
-      minStock: numberOrUndefined(values.minStock),
-      unit: values.unit.trim() || 'UNIDAD',
-      reserveQuantity: numberOrUndefined(values.reserveQuantity),
-      additionalInfo: values.additionalInfo.trim() || undefined,
-      imageUrl: values.imageUrl.trim() || undefined,
-    };
-
-    onSubmit(data);
+    setSelectedImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
+  const submitForm = async (values: ProductFormValues) => {
+    try {
+      setLocalError(null);
+
+      if (!values.providerId) {
+        setLocalError('Debes seleccionar un proveedor');
+        return;
+      }
+
+      if (!values.categoryId) {
+        setLocalError('Debes seleccionar una categoría');
+        return;
+      }
+
+      let finalImageUrl = currentImageUrl || undefined;
+
+      if (selectedImageFile) {
+        setUploadingImage(true);
+        const uploaded = await uploadProductImage(selectedImageFile);
+        finalImageUrl = uploaded.imageUrl;
+        setUploadingImage(false);
+      }
+
+      const data: CreateProductRequest = {
+        name: values.name.trim(),
+        description: values.description.trim() || undefined,
+        providerId: values.providerId,
+        categoryId: values.categoryId,
+        subCategoryId: values.subCategoryId || undefined,
+        weight: values.weight.trim() || undefined,
+        purchasePrice: numberOrZero(values.purchasePrice),
+        priceNormal: numberOrZero(values.priceNormal),
+        priceCamino: numberOrZero(values.priceCamino),
+        priceEspecial: numberOrZero(values.priceEspecial),
+        priceMayorista: numberOrUndefined(values.priceMayorista),
+        minQuantityWholesale: numberOrUndefined(values.minQuantityWholesale),
+        stock: numberOrUndefined(values.stock),
+        minStock: numberOrUndefined(values.minStock),
+        unit: values.unit.trim() || 'UNIDAD',
+        reserveQuantity: numberOrUndefined(values.reserveQuantity),
+        additionalInfo: values.additionalInfo.trim() || undefined,
+        imageUrl: finalImageUrl,
+      };
+
+      onSubmit(data);
+    } catch (uploadError) {
+      setUploadingImage(false);
+
+      const anyError = uploadError as any;
+      const message = anyError?.response?.data?.message;
+
+      if (Array.isArray(message)) {
+        setLocalError(message.join(', '));
+        return;
+      }
+
+      if (typeof message === 'string') {
+        setLocalError(message);
+        return;
+      }
+
+      setLocalError('No se pudo subir la imagen del producto.');
+    }
+  };
+
+  const isBusy = loading || uploadingImage;
+
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="md">
+    <Dialog open={open} onClose={isBusy ? undefined : onClose} fullWidth maxWidth="md">
       <DialogTitle>{product ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
 
       <Box component="form" onSubmit={handleSubmit(submitForm)}>
@@ -184,7 +265,80 @@ export function ProductFormDialog({
             </Alert>
           )}
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '160px 1fr' },
+              gap: 2,
+              mb: 2,
+              alignItems: 'center',
+            }}
+          >
+            <Box
+              sx={{
+                width: 140,
+                height: 140,
+                borderRadius: 2,
+                border: '1px dashed #b0bec5',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                backgroundColor: '#f7f9fb',
+              }}
+            >
+              {imagePreview ? (
+                <Box
+                  component="img"
+                  src={imagePreview}
+                  alt="Producto"
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              ) : (
+                <ImageIcon sx={{ fontSize: 54, color: '#90a4ae' }} />
+              )}
+            </Box>
+
+            <Box>
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<CloudUploadIcon />}
+                disabled={isBusy}
+                sx={{ fontWeight: 800, textTransform: 'none' }}
+              >
+                Seleccionar imagen
+                <input
+                  hidden
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={(event) => handleSelectImage(event.target.files?.[0])}
+                />
+              </Button>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Formatos permitidos: JPG, JPEG, PNG o WEBP. Tamaño máximo: 2MB.
+              </Typography>
+
+              {selectedImageFile && (
+                <Typography variant="caption" color="success.main" fontWeight={700}>
+                  Imagen seleccionada: {selectedImageFile.name}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gap: 2,
+            }}
+          >
             <TextField
               fullWidth
               label="Nombre del producto"
@@ -244,7 +398,13 @@ export function ProductFormDialog({
               ))}
             </TextField>
 
-            <TextField select fullWidth label="Subcategoría" defaultValue="" {...register('subCategoryId')}>
+            <TextField
+              select
+              fullWidth
+              label="Subcategoría"
+              defaultValue=""
+              {...register('subCategoryId')}
+            >
               <MenuItem value="">Sin subcategoría</MenuItem>
               {availableSubCategories.map((subCategory) => (
                 <MenuItem key={subCategory.id} value={subCategory.id}>
@@ -253,13 +413,18 @@ export function ProductFormDialog({
               ))}
             </TextField>
 
-            <TextField fullWidth label="Peso / Presentación" placeholder="Ej: 400g, 1L, 12 unidades" {...register('weight')} />
+            <TextField
+              fullWidth
+              label="Peso / Presentación"
+              placeholder="Ej: 400g, 1L, 12 unidades"
+              {...register('weight')}
+            />
 
             <TextField
               fullWidth
               type="number"
               label="Precio compra"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('purchasePrice', { valueAsNumber: true })}
             />
 
@@ -267,7 +432,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio normal"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('priceNormal', { valueAsNumber: true })}
             />
 
@@ -275,7 +440,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio camino"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('priceCamino', { valueAsNumber: true })}
             />
 
@@ -283,7 +448,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio especial"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('priceEspecial', { valueAsNumber: true })}
             />
 
@@ -291,7 +456,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio mayorista"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('priceMayorista', { valueAsNumber: true })}
             />
 
@@ -299,15 +464,15 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Cantidad mínima mayorista"
-              inputProps={{ min: 0 }}
+              inputProps={integerInputProps}
               {...register('minQuantityWholesale', { valueAsNumber: true })}
             />
 
             <TextField
               fullWidth
               type="number"
-              label="Stock"
-              inputProps={{ min: 0, step: '0.01' }}
+              label="Stock actual"
+              inputProps={decimalInputProps}
               {...register('stock', { valueAsNumber: true })}
             />
 
@@ -315,19 +480,18 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Stock mínimo"
-              inputProps={{ min: 0, step: '0.01' }}
+              inputProps={decimalInputProps}
               {...register('minStock', { valueAsNumber: true })}
             />
 
             <TextField
               fullWidth
               type="number"
-              label="Cantidad reservada"
-              inputProps={{ min: 0, step: '0.01' }}
+              label="Cantidad reserva / alerta"
+              inputProps={decimalInputProps}
+              helperText="Amarillo si está debajo de reserva. Rojo si llega al stock mínimo."
               {...register('reserveQuantity', { valueAsNumber: true })}
             />
-
-            <TextField fullWidth label="URL imagen" {...register('imageUrl')} />
           </Box>
 
           <TextField
@@ -350,12 +514,18 @@ export function ProductFormDialog({
         </DialogContent>
 
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={loading}>
+          <Button onClick={onClose} disabled={isBusy}>
             Cancelar
           </Button>
 
-          <Button type="submit" variant="contained" disabled={loading}>
-            {loading ? 'Guardando...' : product ? 'Actualizar' : 'Crear producto'}
+          <Button type="submit" variant="contained" disabled={isBusy}>
+            {uploadingImage
+              ? 'Subiendo imagen...'
+              : loading
+                ? 'Guardando...'
+                : product
+                  ? 'Actualizar'
+                  : 'Crear producto'}
           </Button>
         </DialogActions>
       </Box>

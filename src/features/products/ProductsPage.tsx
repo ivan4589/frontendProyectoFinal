@@ -19,105 +19,149 @@ import {
   TextField,
   Tooltip,
   Typography,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import CategoryIcon from '@mui/icons-material/Category';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import ManageSearchIcon from '@mui/icons-material/ManageSearch';
-import SearchIcon from '@mui/icons-material/Search';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getProviders } from '../../api/providers.api';
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import CategoryIcon from "@mui/icons-material/Category";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import InventoryIcon from "@mui/icons-material/Inventory";
+import ManageSearchIcon from "@mui/icons-material/ManageSearch";
+import SearchIcon from "@mui/icons-material/Search";
+import StorefrontIcon from "@mui/icons-material/Storefront";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getProviders } from "../../api/providers.api";
 import {
   createProduct,
   deleteProduct,
   getProducts,
   updateProduct,
-} from '../../api/products.api';
+} from "../../api/products.api";
 import {
   createCategory,
   deleteCategory,
   getCategories,
   updateCategory,
-} from '../../api/categories.api';
+} from "../../api/categories.api";
 import {
   createSubCategory,
   deleteSubCategory,
   getSubCategories,
   updateSubCategory,
-} from '../../api/subCategories.api';
-import { Loading } from '../../components/common/Loading';
-import { ErrorMessage } from '../../components/common/ErrorMessage';
-import { useAuth } from '../auth/AuthContext';
-import { formatCurrency } from '../../utils/formatCurrency';
-import { formatDate } from '../../utils/formatDate';
-import type { Provider } from '../../types/provider.types';
+} from "../../api/subCategories.api";
+import { Loading } from "../../components/common/Loading";
+import { ErrorMessage } from "../../components/common/ErrorMessage";
+import { useAuth } from "../auth/AuthContext";
+import { formatCurrency } from "../../utils/formatCurrency";
+import { formatDate } from "../../utils/formatDate";
+import type { Provider } from "../../types/provider.types";
 import type {
   Category,
   CreateProductRequest,
   Product,
   SubCategory,
-} from '../../types/product.types';
-import { ProductFormDialog } from './ProductFormDialog';
-import { CategoriesDialog } from './CategoriesDialog';
+} from "../../types/product.types";
+import { ProductFormDialog } from "./ProductFormDialog";
+import { CategoriesDialog } from "./CategoriesDialog";
+import ImageIcon from "@mui/icons-material/Image";
+import { getImageUrl } from "../../utils/getImageUrl";
 
 function getErrorMessage(error: unknown) {
   const anyError = error as any;
   const message = anyError?.response?.data?.message;
 
-  if (Array.isArray(message)) return message.join(', ');
-  if (typeof message === 'string') return message;
+  if (Array.isArray(message)) return message.join(", ");
+  if (typeof message === "string") return message;
 
   if (anyError?.response?.status === 403) {
-    return 'No tienes permiso para realizar esta acción.';
+    return "No tienes permiso para realizar esta acción.";
   }
 
   if (anyError?.response?.status === 401) {
-    return 'Tu sesión expiró. Vuelve a iniciar sesión.';
+    return "Tu sesión expiró. Vuelve a iniciar sesión.";
   }
 
   if (anyError?.message) return anyError.message;
 
-  return 'Ocurrió un error inesperado.';
+  return "Ocurrió un error inesperado.";
 }
 
 function getInitials(name: string) {
   return name
-    .split(' ')
+    .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
-    .join('');
+    .join("");
 }
 
 function getCategoryName(product: Product, categories: Category[]) {
   if (product.category?.name) return product.category.name;
-  return categories.find((category) => category.id === product.categoryId)?.name || '-';
+  return (
+    categories.find((category) => category.id === product.categoryId)?.name ||
+    "-"
+  );
 }
 
 function getSubCategoryName(product: Product, subCategories: SubCategory[]) {
   if (product.subCategory?.name) return product.subCategory.name;
-  if (!product.subCategoryId) return '-';
-  return subCategories.find((item) => item.id === product.subCategoryId)?.name || '-';
+  if (!product.subCategoryId) return "-";
+  return (
+    subCategories.find((item) => item.id === product.subCategoryId)?.name || "-"
+  );
 }
 
 function getProviderName(product: Product, providers: Provider[]) {
   if (product.provider?.companyName) return product.provider.companyName;
-  return providers.find((provider) => provider.id === product.providerId)?.companyName || '-';
+  return (
+    providers.find((provider) => provider.id === product.providerId)
+      ?.companyName || "-"
+  );
+}
+
+function getStockStatus(product: Product) {
+  const stock = Number(product.stock || 0);
+  const minStock = Number(product.minStock || 0);
+  const reserveQuantity = Number(product.reserveQuantity || 0);
+
+  if (minStock > 0 && stock <= minStock) {
+    return {
+      label: "Stock crítico",
+      bg: "#ffebee",
+      color: "#d32f2f",
+      avatarBg: "#ffebee",
+      avatarColor: "#d32f2f",
+    };
+  }
+
+  if (reserveQuantity > 0 && stock <= reserveQuantity) {
+    return {
+      label: "Stock en reserva",
+      bg: "#fff8e1",
+      color: "#f57c00",
+      avatarBg: "#fff3e0",
+      avatarColor: "#ef6c00",
+    };
+  }
+
+  return {
+    label: "Stock normal",
+    bg: "#e8f5e9",
+    color: "#2e7d32",
+    avatarBg: "#e8f5e9",
+    avatarColor: "#005b3f",
+  };
 }
 
 export function ProductsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === "ADMIN";
 
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [providerFilter, setProviderFilter] = useState('ALL');
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [providerFilter, setProviderFilter] = useState("ALL");
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoriesDialogOpen, setCategoriesDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -130,7 +174,7 @@ export function ProductsPage() {
     isError: productsIsError,
     error: productsError,
   } = useQuery({
-    queryKey: ['products'],
+    queryKey: ["products"],
     queryFn: () => getProducts(),
   });
 
@@ -140,7 +184,7 @@ export function ProductsPage() {
     isError: providersIsError,
     error: providersError,
   } = useQuery({
-    queryKey: ['providers'],
+    queryKey: ["providers"],
     queryFn: getProviders,
   });
 
@@ -150,7 +194,7 @@ export function ProductsPage() {
     isError: categoriesIsError,
     error: categoriesError,
   } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ["categories"],
     queryFn: getCategories,
   });
 
@@ -160,7 +204,7 @@ export function ProductsPage() {
     isError: subCategoriesIsError,
     error: subCategoriesError,
   } = useQuery({
-    queryKey: ['sub-categories'],
+    queryKey: ["sub-categories"],
     queryFn: () => getSubCategories(),
   });
 
@@ -184,21 +228,32 @@ export function ProductsPage() {
           .some((value) => String(value).toLowerCase().includes(text));
 
       const matchesCategory =
-        categoryFilter === 'ALL' || product.categoryId === categoryFilter;
+        categoryFilter === "ALL" || product.categoryId === categoryFilter;
 
       const matchesProvider =
-        providerFilter === 'ALL' || product.providerId === providerFilter;
+        providerFilter === "ALL" || product.providerId === providerFilter;
 
       return matchesText && matchesCategory && matchesProvider;
     });
-  }, [products, categories, subCategories, providers, search, categoryFilter, providerFilter]);
+  }, [
+    products,
+    categories,
+    subCategories,
+    providers,
+    search,
+    categoryFilter,
+    providerFilter,
+  ]);
 
   const summary = useMemo(() => {
     const lowStock = products.filter(
       (product) => product.minStock > 0 && product.stock <= product.minStock,
     ).length;
 
-    const totalStock = products.reduce((sum, product) => sum + product.stock, 0);
+    const totalStock = products.reduce(
+      (sum, product) => sum + product.stock,
+      0,
+    );
 
     const inventoryValue = products.reduce(
       (sum, product) => sum + product.stock * product.purchasePrice,
@@ -217,7 +272,7 @@ export function ProductsPage() {
   const createProductMutation = useMutation({
     mutationFn: createProduct,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setProductDialogOpen(false);
       setSelectedProduct(null);
       setProductFormError(null);
@@ -231,7 +286,7 @@ export function ProductsPage() {
     mutationFn: ({ id, data }: { id: string; data: CreateProductRequest }) =>
       updateProduct(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setProductDialogOpen(false);
       setSelectedProduct(null);
       setProductFormError(null);
@@ -244,7 +299,7 @@ export function ProductsPage() {
   const deleteProductMutation = useMutation({
     mutationFn: deleteProduct,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (mutationError) => {
       alert(getErrorMessage(mutationError));
@@ -254,7 +309,7 @@ export function ProductsPage() {
   const createCategoryMutation = useMutation({
     mutationFn: createCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -266,8 +321,8 @@ export function ProductsPage() {
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateCategory(id, { name }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -278,8 +333,8 @@ export function ProductsPage() {
   const deleteCategoryMutation = useMutation({
     mutationFn: deleteCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -290,7 +345,7 @@ export function ProductsPage() {
   const createSubCategoryMutation = useMutation({
     mutationFn: createSubCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sub-categories'] });
+      queryClient.invalidateQueries({ queryKey: ["sub-categories"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -309,8 +364,8 @@ export function ProductsPage() {
       categoryId: string;
     }) => updateSubCategory(id, { name, categoryId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sub-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["sub-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -321,8 +376,8 @@ export function ProductsPage() {
   const deleteSubCategoryMutation = useMutation({
     mutationFn: deleteSubCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sub-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ["sub-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setCategoryError(null);
     },
     onError: (mutationError) => {
@@ -372,16 +427,26 @@ export function ProductsPage() {
     updateSubCategoryMutation.isPending ||
     deleteSubCategoryMutation.isPending;
 
-  const productLoading = createProductMutation.isPending || updateProductMutation.isPending;
+  const productLoading =
+    createProductMutation.isPending || updateProductMutation.isPending;
 
-  if (productsLoading || providersLoading || categoriesLoading || subCategoriesLoading) {
+  if (
+    productsLoading ||
+    providersLoading ||
+    categoriesLoading ||
+    subCategoriesLoading
+  ) {
     return <Loading message="Cargando productos..." />;
   }
 
-  if (productsIsError) return <ErrorMessage message={getErrorMessage(productsError)} />;
-  if (providersIsError) return <ErrorMessage message={getErrorMessage(providersError)} />;
-  if (categoriesIsError) return <ErrorMessage message={getErrorMessage(categoriesError)} />;
-  if (subCategoriesIsError) return <ErrorMessage message={getErrorMessage(subCategoriesError)} />;
+  if (productsIsError)
+    return <ErrorMessage message={getErrorMessage(productsError)} />;
+  if (providersIsError)
+    return <ErrorMessage message={getErrorMessage(providersError)} />;
+  if (categoriesIsError)
+    return <ErrorMessage message={getErrorMessage(categoriesError)} />;
+  if (subCategoriesIsError)
+    return <ErrorMessage message={getErrorMessage(subCategoriesError)} />;
 
   return (
     <>
@@ -397,20 +462,28 @@ export function ProductsPage() {
 
       <Box
         sx={{
-          display: 'grid',
+          display: "grid",
           gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(2, 1fr)',
-            lg: 'repeat(5, 1fr)',
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            lg: "repeat(5, 1fr)",
           },
           gap: 2,
           mb: 3,
         }}
       >
         <Card sx={{ p: 2.5 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
             <Box>
-              <Typography variant="caption" fontWeight={800} color="text.secondary">
+              <Typography
+                variant="caption"
+                fontWeight={800}
+                color="text.secondary"
+              >
                 TOTAL PRODUCTOS
               </Typography>
               <Typography variant="h4" fontWeight={800}>
@@ -420,7 +493,7 @@ export function ProductsPage() {
                 Registrados
               </Typography>
             </Box>
-            <Avatar sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }}>
+            <Avatar sx={{ bgcolor: "#e3f2fd", color: "#1565c0" }}>
               <InventoryIcon />
             </Avatar>
           </Stack>
@@ -439,19 +512,30 @@ export function ProductsPage() {
         </Card>
 
         <Card sx={{ p: 2.5 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
             <Box>
-              <Typography variant="caption" fontWeight={800} color="text.secondary">
+              <Typography
+                variant="caption"
+                fontWeight={800}
+                color="text.secondary"
+              >
                 STOCK BAJO
               </Typography>
               <Typography variant="h4" fontWeight={800}>
                 {summary.lowStock}
               </Typography>
-              <Typography variant="caption" color={summary.lowStock > 0 ? 'error.main' : 'success.main'}>
+              <Typography
+                variant="caption"
+                color={summary.lowStock > 0 ? "error.main" : "success.main"}
+              >
                 Alertas
               </Typography>
             </Box>
-            <Avatar sx={{ bgcolor: '#ffebee', color: '#d32f2f' }}>
+            <Avatar sx={{ bgcolor: "#ffebee", color: "#d32f2f" }}>
               <WarningAmberIcon />
             </Avatar>
           </Stack>
@@ -484,15 +568,16 @@ export function ProductsPage() {
 
       {!isAdmin && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Tu rol permite consultar productos. La creación, edición y eliminación están reservadas para administradores.
+          Tu rol permite consultar productos. La creación, edición y eliminación
+          están reservadas para administradores.
         </Alert>
       )}
 
       <Paper sx={{ p: 2.5 }}>
         <Stack
-          direction={{ xs: 'column', md: 'row' }}
+          direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
-          alignItems={{ xs: 'stretch', md: 'center' }}
+          alignItems={{ xs: "stretch", md: "center" }}
           spacing={2}
           sx={{ mb: 2 }}
         >
@@ -506,7 +591,7 @@ export function ProductsPage() {
             </Typography>
           </Box>
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               size="small"
               placeholder="Buscar producto..."
@@ -558,7 +643,7 @@ export function ProductsPage() {
                 variant="outlined"
                 startIcon={<ManageSearchIcon />}
                 onClick={() => setCategoriesDialogOpen(true)}
-                sx={{ fontWeight: 800, textTransform: 'none' }}
+                sx={{ fontWeight: 800, textTransform: "none" }}
               >
                 Categorías
               </Button>
@@ -570,11 +655,11 @@ export function ProductsPage() {
                 startIcon={<AddIcon />}
                 onClick={handleCreateProduct}
                 sx={{
-                  backgroundColor: '#005b3f',
+                  backgroundColor: "#005b3f",
                   fontWeight: 800,
-                  textTransform: 'none',
-                  '&:hover': {
-                    backgroundColor: '#00432f',
+                  textTransform: "none",
+                  "&:hover": {
+                    backgroundColor: "#00432f",
                   },
                 }}
               >
@@ -589,12 +674,12 @@ export function ProductsPage() {
             <TableHead>
               <TableRow
                 sx={{
-                  '& th': {
+                  "& th": {
                     fontWeight: 800,
                     fontSize: 12,
-                    color: 'text.secondary',
-                    textTransform: 'uppercase',
-                    backgroundColor: '#f7f9fb',
+                    color: "text.secondary",
+                    textTransform: "uppercase",
+                    backgroundColor: "#f7f9fb",
                   },
                 }}
               >
@@ -620,30 +705,55 @@ export function ProductsPage() {
               )}
 
               {filteredProducts.map((product) => {
-                const isLowStock = product.minStock > 0 && product.stock <= product.minStock;
+                const stockStatus = getStockStatus(product);
 
                 return (
-                  <TableRow key={product.id} hover sx={{ '& td': { borderColor: '#edf0f2' } }}>
+                  <TableRow
+                    key={product.id}
+                    hover
+                    sx={{ "& td": { borderColor: "#edf0f2" } }}
+                  >
                     <TableCell>
                       <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar
-                          variant="rounded"
+                        <Box
                           sx={{
-                            width: 38,
-                            height: 38,
-                            bgcolor: isLowStock ? '#ffebee' : '#e8f5e9',
-                            color: isLowStock ? '#d32f2f' : '#005b3f',
-                            fontSize: 13,
-                            fontWeight: 800,
+                            width: 42,
+                            height: 42,
+                            borderRadius: 2,
+                            overflow: "hidden",
+                            border: "1px solid #edf0f2",
+                            bgcolor: stockStatus.avatarBg,
+                            color: stockStatus.avatarColor,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
                           }}
                         >
-                          {getInitials(product.name)}
-                        </Avatar>
+                          {product.imageUrl ? (
+                            <Box
+                              component="img"
+                              src={getImageUrl(product.imageUrl)}
+                              alt={product.name}
+                              sx={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          ) : (
+                            <ImageIcon fontSize="small" />
+                          )}
+                        </Box>
 
                         <Box>
-                          <Typography fontWeight={800}>{product.name}</Typography>
+                          <Typography fontWeight={800}>
+                            {product.name}
+                          </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {product.weight || product.unit || `ID: ${product.id.slice(0, 8)}`}
+                            {product.weight ||
+                              product.unit ||
+                              `ID: ${product.id.slice(0, 8)}`}
                           </Typography>
                         </Box>
                       </Stack>
@@ -655,7 +765,11 @@ export function ProductsPage() {
                           size="small"
                           icon={<CategoryIcon />}
                           label={getCategoryName(product, categories)}
-                          sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 700 }}
+                          sx={{
+                            bgcolor: "#e3f2fd",
+                            color: "#1565c0",
+                            fontWeight: 700,
+                          }}
                         />
                         <Typography variant="caption" color="text.secondary">
                           {getSubCategoryName(product, subCategories)}
@@ -676,15 +790,26 @@ export function ProductsPage() {
                       <Stack spacing={0.5}>
                         <Chip
                           size="small"
-                          label={`${product.stock} ${product.unit || ''}`}
+                          label={`${product.stock} ${product.unit || ""}`}
                           sx={{
-                            bgcolor: isLowStock ? '#ffebee' : '#e8f5e9',
-                            color: isLowStock ? '#d32f2f' : '#2e7d32',
+                            bgcolor: stockStatus.bg,
+                            color: stockStatus.color,
                             fontWeight: 800,
                           }}
                         />
                         <Typography variant="caption" color="text.secondary">
-                          Mínimo: {product.minStock}
+                          Mínimo: {product.minStock} | Reserva:{" "}
+                          {product.reserveQuantity || 0}
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: stockStatus.color,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {stockStatus.label}
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -692,26 +817,36 @@ export function ProductsPage() {
                     <TableCell>
                       <Stack spacing={0.2}>
                         <Typography variant="body2">
-                          Normal: <strong>{formatCurrency(product.priceNormal)}</strong>
+                          Normal:{" "}
+                          <strong>{formatCurrency(product.priceNormal)}</strong>
                         </Typography>
                         <Typography variant="body2">
-                          Camino: <strong>{formatCurrency(product.priceCamino)}</strong>
+                          Camino:{" "}
+                          <strong>{formatCurrency(product.priceCamino)}</strong>
                         </Typography>
                         <Typography variant="body2">
-                          Especial: <strong>{formatCurrency(product.priceEspecial)}</strong>
+                          Especial:{" "}
+                          <strong>
+                            {formatCurrency(product.priceEspecial)}
+                          </strong>
                         </Typography>
                       </Stack>
                     </TableCell>
 
                     <TableCell>
-                      <Typography variant="body2">{formatDate(product.createdAt)}</Typography>
+                      <Typography variant="body2">
+                        {formatDate(product.createdAt)}
+                      </Typography>
                     </TableCell>
 
                     <TableCell align="right">
                       {isAdmin ? (
                         <>
                           <Tooltip title="Editar">
-                            <IconButton size="small" onClick={() => handleEditProduct(product)}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleEditProduct(product)}
+                            >
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -728,7 +863,15 @@ export function ProductsPage() {
                           </Tooltip>
                         </>
                       ) : (
-                        <Chip size="small" label="Solo lectura" sx={{ bgcolor: '#eef2f4', color: 'text.secondary', fontWeight: 700 }} />
+                        <Chip
+                          size="small"
+                          label="Solo lectura"
+                          sx={{
+                            bgcolor: "#eef2f4",
+                            color: "text.secondary",
+                            fontWeight: 700,
+                          }}
+                        />
                       )}
                     </TableCell>
                   </TableRow>
@@ -766,7 +909,9 @@ export function ProductsPage() {
           setCategoryError(null);
         }}
         onCreateCategory={(name) => createCategoryMutation.mutate({ name })}
-        onUpdateCategory={(id, name) => updateCategoryMutation.mutate({ id, name })}
+        onUpdateCategory={(id, name) =>
+          updateCategoryMutation.mutate({ id, name })
+        }
         onDeleteCategory={(category) => {
           const confirmed = window.confirm(
             `¿Seguro que deseas eliminar la categoría "${category.name}"? Si tiene productos asociados, el backend puede bloquear la eliminación.`,
