@@ -13,7 +13,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ImageIcon from '@mui/icons-material/Image';
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { uploadProductImage } from '../../api/uploads.api';
 import { getImageUrl } from '../../utils/getImageUrl';
 import type { Provider } from '../../types/provider.types';
@@ -56,14 +56,20 @@ interface ProductFormValues {
   additionalInfo: string;
 }
 
-const decimalInputProps = {
-  min: 0,
-  step: '0.01',
+const decimalSlotProps = {
+  htmlInput: {
+    min: 0,
+    step: 'any',
+    inputMode: 'decimal' as const,
+  },
 };
 
-const integerInputProps = {
-  min: 0,
-  step: '1',
+const integerSlotProps = {
+  htmlInput: {
+    min: 0,
+    step: 1,
+    inputMode: 'numeric' as const,
+  },
 };
 
 function numberOrZero(value: number | '') {
@@ -80,6 +86,29 @@ function numberOrUndefined(value: number | '') {
   const parsed = Number(value);
 
   return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function getProductProviderId(product?: Product | null) {
+  return product?.providerId || product?.provider?.id || '';
+}
+
+function getProductCategoryId(product?: Product | null) {
+  return product?.categoryId || product?.category?.id || '';
+}
+
+function getProductSubCategoryId(product?: Product | null) {
+  return product?.subCategoryId || product?.subCategory?.id || '';
+}
+
+function getUploadErrorMessage(error: unknown) {
+  const anyError = error as any;
+  const message = anyError?.response?.data?.message;
+
+  if (Array.isArray(message)) return message.join(', ');
+  if (typeof message === 'string') return message;
+  if (anyError?.message) return anyError.message;
+
+  return 'No se pudo subir la imagen del producto.';
 }
 
 export function ProductFormDialog({
@@ -101,9 +130,11 @@ export function ProductFormDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<ProductFormValues>({
     defaultValues: {
@@ -136,34 +167,67 @@ export function ProductFormDialog({
   }, [subCategories, selectedCategoryId]);
 
   useEffect(() => {
-    if (open) {
-      reset({
-        name: product?.name || '',
-        description: product?.description || '',
-        providerId: product?.providerId || '',
-        categoryId: product?.categoryId || '',
-        subCategoryId: product?.subCategoryId || '',
-        weight: product?.weight || '',
-        purchasePrice: product?.purchasePrice ?? 0,
-        priceNormal: product?.priceNormal ?? 0,
-        priceCamino: product?.priceCamino ?? 0,
-        priceEspecial: product?.priceEspecial ?? 0,
-        priceMayorista: product?.priceMayorista ?? '',
-        minQuantityWholesale: product?.minQuantityWholesale ?? '',
-        stock: product?.stock ?? 0,
-        minStock: product?.minStock ?? 0,
-        unit: product?.unit || 'UNIDAD',
-        reserveQuantity: product?.reserveQuantity ?? 0,
-        additionalInfo: product?.additionalInfo || '',
-      });
+    if (!open) return;
 
-      setCurrentImageUrl(product?.imageUrl || '');
-      setImagePreview(product?.imageUrl ? getImageUrl(product.imageUrl) : '');
-      setSelectedImageFile(null);
-      setLocalError(null);
-      setUploadingImage(false);
-    }
+    const providerId = getProductProviderId(product);
+    const categoryId = getProductCategoryId(product);
+    const subCategoryId = getProductSubCategoryId(product);
+
+    reset({
+      name: product?.name || '',
+      description: product?.description || '',
+      providerId,
+      categoryId,
+      subCategoryId,
+      weight: product?.weight || '',
+      purchasePrice: product?.purchasePrice ?? 0,
+      priceNormal: product?.priceNormal ?? 0,
+      priceCamino: product?.priceCamino ?? 0,
+      priceEspecial: product?.priceEspecial ?? 0,
+      priceMayorista: product?.priceMayorista ?? '',
+      minQuantityWholesale: product?.minQuantityWholesale ?? '',
+      stock: product?.stock ?? 0,
+      minStock: product?.minStock ?? 0,
+      unit: product?.unit || 'UNIDAD',
+      reserveQuantity: product?.reserveQuantity ?? 0,
+      additionalInfo: product?.additionalInfo || '',
+    });
+
+    setCurrentImageUrl(product?.imageUrl || '');
+    setImagePreview(product?.imageUrl ? getImageUrl(product.imageUrl) : '');
+    setSelectedImageFile(null);
+    setLocalError(null);
+    setUploadingImage(false);
   }, [open, product, reset]);
+
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      setValue('subCategoryId', '');
+      return;
+    }
+
+    const currentSubCategoryId = getProductSubCategoryId(product);
+
+    const existsInSelectedCategory = subCategories.some(
+      (subCategory) =>
+        subCategory.id === currentSubCategoryId &&
+        subCategory.categoryId === selectedCategoryId,
+    );
+
+    if (!existsInSelectedCategory && open) {
+      const currentValue = watch('subCategoryId');
+
+      const currentStillValid = subCategories.some(
+        (subCategory) =>
+          subCategory.id === currentValue &&
+          subCategory.categoryId === selectedCategoryId,
+      );
+
+      if (!currentStillValid) {
+        setValue('subCategoryId', '');
+      }
+    }
+  }, [selectedCategoryId, subCategories, product, open, setValue, watch]);
 
   const handleSelectImage = (file?: File) => {
     setLocalError(null);
@@ -233,21 +297,7 @@ export function ProductFormDialog({
       onSubmit(data);
     } catch (uploadError) {
       setUploadingImage(false);
-
-      const anyError = uploadError as any;
-      const message = anyError?.response?.data?.message;
-
-      if (Array.isArray(message)) {
-        setLocalError(message.join(', '));
-        return;
-      }
-
-      if (typeof message === 'string') {
-        setLocalError(message);
-        return;
-      }
-
-      setLocalError('No se pudo subir la imagen del producto.');
+      setLocalError(getUploadErrorMessage(uploadError));
     }
   };
 
@@ -360,58 +410,77 @@ export function ProductFormDialog({
               {...register('unit')}
             />
 
-            <TextField
-              select
-              fullWidth
-              label="Proveedor"
-              defaultValue=""
-              error={Boolean(errors.providerId)}
-              helperText={errors.providerId?.message}
-              {...register('providerId', {
-                required: 'El proveedor es obligatorio',
-              })}
-            >
-              <MenuItem value="">Seleccionar proveedor</MenuItem>
-              {providers.map((provider) => (
-                <MenuItem key={provider.id} value={provider.id}>
-                  {provider.companyName}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Controller
+              name="providerId"
+              control={control}
+              rules={{ required: 'El proveedor es obligatorio' }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  select
+                  fullWidth
+                  label="Proveedor"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                >
+                  <MenuItem value="">Seleccionar proveedor</MenuItem>
+                  {providers.map((provider) => (
+                    <MenuItem key={provider.id} value={provider.id}>
+                      {provider.companyName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            />
 
-            <TextField
-              select
-              fullWidth
-              label="Categoría"
-              defaultValue=""
-              error={Boolean(errors.categoryId)}
-              helperText={errors.categoryId?.message}
-              {...register('categoryId', {
-                required: 'La categoría es obligatoria',
-              })}
-            >
-              <MenuItem value="">Seleccionar categoría</MenuItem>
-              {categories.map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Controller
+              name="categoryId"
+              control={control}
+              rules={{ required: 'La categoría es obligatoria' }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  select
+                  fullWidth
+                  label="Categoría"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                >
+                  <MenuItem value="">Seleccionar categoría</MenuItem>
+                  {categories.map((category) => (
+                    <MenuItem key={category.id} value={category.id}>
+                      {category.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            />
 
-            <TextField
-              select
-              fullWidth
-              label="Subcategoría"
-              defaultValue=""
-              {...register('subCategoryId')}
-            >
-              <MenuItem value="">Sin subcategoría</MenuItem>
-              {availableSubCategories.map((subCategory) => (
-                <MenuItem key={subCategory.id} value={subCategory.id}>
-                  {subCategory.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Controller
+              name="subCategoryId"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  select
+                  fullWidth
+                  label="Subcategoría"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                >
+                  <MenuItem value="">Sin subcategoría</MenuItem>
+                  {availableSubCategories.map((subCategory) => (
+                    <MenuItem key={subCategory.id} value={subCategory.id}>
+                      {subCategory.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+            />
 
             <TextField
               fullWidth
@@ -424,7 +493,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio compra"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('purchasePrice', { valueAsNumber: true })}
             />
 
@@ -432,7 +501,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio normal"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('priceNormal', { valueAsNumber: true })}
             />
 
@@ -440,7 +509,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio camino"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('priceCamino', { valueAsNumber: true })}
             />
 
@@ -448,7 +517,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio especial"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('priceEspecial', { valueAsNumber: true })}
             />
 
@@ -456,7 +525,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Precio mayorista"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('priceMayorista', { valueAsNumber: true })}
             />
 
@@ -464,7 +533,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Cantidad mínima mayorista"
-              inputProps={integerInputProps}
+              slotProps={integerSlotProps}
               {...register('minQuantityWholesale', { valueAsNumber: true })}
             />
 
@@ -472,7 +541,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Stock actual"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('stock', { valueAsNumber: true })}
             />
 
@@ -480,7 +549,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Stock mínimo"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               {...register('minStock', { valueAsNumber: true })}
             />
 
@@ -488,7 +557,7 @@ export function ProductFormDialog({
               fullWidth
               type="number"
               label="Cantidad reserva / alerta"
-              inputProps={decimalInputProps}
+              slotProps={decimalSlotProps}
               helperText="Amarillo si está debajo de reserva. Rojo si llega al stock mínimo."
               {...register('reserveQuantity', { valueAsNumber: true })}
             />

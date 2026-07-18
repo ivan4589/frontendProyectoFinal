@@ -70,23 +70,28 @@ import { getImageUrl } from "../../utils/getImageUrl";
 function getErrorMessage(error: unknown) {
   const anyError = error as any;
   const message = anyError?.response?.data?.message;
+  const errorText = anyError?.response?.data?.error;
 
-  if (Array.isArray(message)) return message.join(", ");
-  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message.join(', ');
+  if (typeof message === 'string') return message;
+  if (typeof errorText === 'string') return errorText;
 
   if (anyError?.response?.status === 403) {
-    return "No tienes permiso para realizar esta acción.";
+    return 'No tienes permiso para realizar esta acción.';
   }
 
   if (anyError?.response?.status === 401) {
-    return "Tu sesión expiró. Vuelve a iniciar sesión.";
+    return 'Tu sesión expiró. Vuelve a iniciar sesión.';
+  }
+
+  if (anyError?.response?.status === 400) {
+    return 'No se pudo completar la operación. Revisa los datos enviados.';
   }
 
   if (anyError?.message) return anyError.message;
 
-  return "Ocurrió un error inesperado.";
+  return 'Ocurrió un error inesperado.';
 }
-
 function getInitials(name: string) {
   return name
     .split(" ")
