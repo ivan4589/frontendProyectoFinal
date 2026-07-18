@@ -7,6 +7,7 @@ import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { ProvidersPage } from '../features/providers/ProvidersPage';
 import { ClientsPage } from '../features/clients/ClientsPage';
 import { ProductsPage } from '../features/products/ProductsPage';
+import { PurchasesPage } from '../features/purchases/PurchasesPage';
 import { useAuth } from '../features/auth/AuthContext';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -63,7 +64,7 @@ export function AppRouter() {
         <Route path="clients" element={<ClientsPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="providers" element={<ProvidersPage />} />
-        <Route path="purchases" element={<PlaceholderPage title="Compras" />} />
+        <Route path="purchases" element={<PurchasesPage />} />
         <Route path="sales" element={<PlaceholderPage title="Ventas" />} />
         <Route path="reports" element={<PlaceholderPage title="Reportes" />} />
         <Route path="*" element={<NotFoundPage />} />
