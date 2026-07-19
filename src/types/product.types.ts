@@ -44,6 +44,7 @@ export interface Product {
   priceMayorista?: number | null;
   minQuantityWholesale?: number | null;
   stock: number;
+  reservedStock?: number;
   minStock: number;
   unit: string;
   reserveQuantity?: number | null;
@@ -67,6 +68,7 @@ export interface CreateProductRequest {
   priceMayorista?: number;
   minQuantityWholesale?: number;
   stock?: number;
+  reservedStock?: number;
   minStock?: number;
   unit?: string;
   reserveQuantity?: number;
