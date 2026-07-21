@@ -10,6 +10,7 @@ import {
   IconButton,
   MenuItem,
   Paper,
+  Slider,
   Stack,
   TextField,
   Typography,
@@ -55,6 +56,13 @@ interface DraftDetail {
   minQuantityWholesale: number | null;
 }
 
+type SalePriceField =
+  | 'priceNormal'
+  | 'priceCamino'
+  | 'priceEspecial'
+  | 'priceMayorista'
+  | 'minQuantityWholesale';
+
 const decimalInputProps = {
   min: 0,
   step: 'any',
@@ -65,6 +73,36 @@ function roundMoney(value: number) {
   return Math.round(
     (value + Number.EPSILON) * 100,
   ) / 100;
+}
+
+function calculatePrice(
+  purchasePrice: number,
+  percentage: number,
+) {
+  return roundMoney(
+    purchasePrice * (1 + percentage / 100),
+  );
+}
+
+function calculateMargin(
+  purchasePrice: number,
+  salePrice: number,
+) {
+  if (purchasePrice <= 0 || salePrice <= 0) {
+    return 10;
+  }
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((salePrice - purchasePrice) /
+          purchasePrice) *
+          100,
+      ),
+    ),
+  );
 }
 
 export function PurchaseFormDialog({
@@ -94,6 +132,18 @@ export function PurchaseFormDialog({
     useState<number | ''>(1);
   const [unitPrice, setUnitPrice] =
     useState<number | ''>('');
+  const [marginPercentage, setMarginPercentage] =
+    useState(10);
+  const [priceNormal, setPriceNormal] =
+    useState<number | ''>('');
+  const [priceCamino, setPriceCamino] =
+    useState<number | ''>('');
+  const [priceEspecial, setPriceEspecial] =
+    useState<number | ''>('');
+  const [priceMayorista, setPriceMayorista] =
+    useState<number | ''>('');
+  const [minQuantityWholesale, setMinQuantityWholesale] =
+    useState<number | ''>('');
 
   const [localError, setLocalError] =
     useState<string | null>(null);
@@ -108,13 +158,43 @@ export function PurchaseFormDialog({
     const initialDetails =
       purchase?.providerGroups.flatMap(
         (group) =>
-          group.details.map((detail) => ({
-            productId: detail.productId,
-            providerId: group.providerId,
-            categoryId: detail.categoryId,
-            quantity: detail.quantity,
-            unitPrice: detail.unitPrice,
-          })),
+          group.details.map((detail) => {
+            const product = products.find(
+              (item) => item.id === detail.productId,
+            );
+            const fallbackPrice = calculatePrice(
+              detail.unitPrice,
+              10,
+            );
+
+            return {
+              productId: detail.productId,
+              providerId: group.providerId,
+              categoryId: detail.categoryId,
+              quantity: detail.quantity,
+              unitPrice: detail.unitPrice,
+              priceNormal:
+                detail.priceNormal ??
+                product?.priceNormal ??
+                fallbackPrice,
+              priceCamino:
+                detail.priceCamino ??
+                product?.priceCamino ??
+                fallbackPrice,
+              priceEspecial:
+                detail.priceEspecial ??
+                product?.priceEspecial ??
+                fallbackPrice,
+              priceMayorista:
+                detail.priceMayorista ??
+                product?.priceMayorista ??
+                fallbackPrice,
+              minQuantityWholesale:
+                detail.minQuantityWholesale ??
+                product?.minQuantityWholesale ??
+                1,
+            };
+          }),
       ) || [];
 
     setDetails(initialDetails);
@@ -123,6 +203,12 @@ export function PurchaseFormDialog({
     setProductId('');
     setQuantity(1);
     setUnitPrice('');
+    setMarginPercentage(10);
+    setPriceNormal('');
+    setPriceCamino('');
+    setPriceEspecial('');
+    setPriceMayorista('');
+    setMinQuantityWholesale('');
     setLocalError(null);
   }, [open, purchase]);
 
@@ -190,6 +276,33 @@ export function PurchaseFormDialog({
 
   const selectedProduct =
     productMap.get(productId) || null;
+
+  const setCalculatedPrices = (
+    purchasePrice: number,
+    percentage: number,
+  ) => {
+    const calculated = calculatePrice(
+      purchasePrice,
+      percentage,
+    );
+
+    setPriceNormal(calculated);
+    setPriceCamino(calculated);
+    setPriceEspecial(calculated);
+    setPriceMayorista(calculated);
+  };
+
+  const resetProductFields = () => {
+    setProductId('');
+    setQuantity(1);
+    setUnitPrice('');
+    setMarginPercentage(10);
+    setPriceNormal('');
+    setPriceCamino('');
+    setPriceEspecial('');
+    setPriceMayorista('');
+    setMinQuantityWholesale('');
+  };
 
   const groupedDetails = useMemo(() => {
     const groups = new Map<
@@ -296,16 +409,14 @@ export function PurchaseFormDialog({
     // Los productos agregados no se modifican.
     setProviderId(value);
     setCategoryId('');
-    setProductId('');
-    setUnitPrice('');
+    resetProductFields();
   };
 
   const handleCategoryChange = (
     value: string,
   ) => {
     setCategoryId(value);
-    setProductId('');
-    setUnitPrice('');
+    resetProductFields();
   };
 
   const handleProductChange = (
@@ -313,9 +424,73 @@ export function PurchaseFormDialog({
   ) => {
     setProductId(product?.id || '');
 
-    setUnitPrice(
-      product?.purchasePrice ?? '',
+    if (!product) {
+      setUnitPrice('');
+      setMarginPercentage(10);
+      setPriceNormal('');
+      setPriceCamino('');
+      setPriceEspecial('');
+      setPriceMayorista('');
+      setMinQuantityWholesale('');
+      return;
+    }
+
+    const currentMargin = calculateMargin(
+      product.purchasePrice,
+      product.priceNormal,
     );
+
+    setUnitPrice(product.purchasePrice);
+    setMarginPercentage(currentMargin);
+    setPriceNormal(product.priceNormal);
+    setPriceCamino(product.priceCamino);
+    setPriceEspecial(product.priceEspecial);
+    setPriceMayorista(
+      product.priceMayorista ??
+        calculatePrice(
+          product.purchasePrice,
+          currentMargin,
+        ),
+    );
+    setMinQuantityWholesale(
+      product.minQuantityWholesale ?? 1,
+    );
+  };
+
+  const handleUnitPriceChange = (
+    value: string,
+  ) => {
+    if (value === '') {
+      setUnitPrice('');
+      setPriceNormal('');
+      setPriceCamino('');
+      setPriceEspecial('');
+      setPriceMayorista('');
+      return;
+    }
+
+    const numericValue = Number(value);
+    setUnitPrice(numericValue);
+
+    if (numericValue > 0) {
+      setCalculatedPrices(
+        numericValue,
+        marginPercentage,
+      );
+    }
+  };
+
+  const handleMarginChange = (
+    percentage: number,
+  ) => {
+    setMarginPercentage(percentage);
+
+    if (unitPrice !== '' && unitPrice > 0) {
+      setCalculatedPrices(
+        Number(unitPrice),
+        percentage,
+      );
+    }
   };
 
   const handleAddProduct = () => {
@@ -323,6 +498,13 @@ export function PurchaseFormDialog({
 
     const parsedQuantity = Number(quantity);
     const parsedPrice = Number(unitPrice);
+    const parsedPriceNormal = Number(priceNormal);
+    const parsedPriceCamino = Number(priceCamino);
+    const parsedPriceEspecial = Number(priceEspecial);
+    const parsedPriceMayorista = Number(priceMayorista);
+    const parsedMinQuantityWholesale = Number(
+      minQuantityWholesale,
+    );
 
     if (
       !providerId ||
@@ -341,6 +523,30 @@ export function PurchaseFormDialog({
     ) {
       setLocalError(
         'La cantidad y el precio deben ser mayores a cero',
+      );
+      return;
+    }
+
+    if (
+      parsedPriceNormal <= 0 ||
+      parsedPriceCamino <= 0 ||
+      parsedPriceEspecial <= 0 ||
+      parsedPriceMayorista <= 0
+    ) {
+      setLocalError(
+        'Todos los precios de venta deben ser mayores a cero',
+      );
+      return;
+    }
+
+    if (
+      !Number.isInteger(
+        parsedMinQuantityWholesale,
+      ) ||
+      parsedMinQuantityWholesale <= 0
+    ) {
+      setLocalError(
+        'La cantidad mínima mayorista debe ser un número entero mayor a cero',
       );
       return;
     }
@@ -364,6 +570,20 @@ export function PurchaseFormDialog({
                 unitPrice: roundMoney(
                   parsedPrice,
                 ),
+                priceNormal: roundMoney(
+                  parsedPriceNormal,
+                ),
+                priceCamino: roundMoney(
+                  parsedPriceCamino,
+                ),
+                priceEspecial: roundMoney(
+                  parsedPriceEspecial,
+                ),
+                priceMayorista: roundMoney(
+                  parsedPriceMayorista,
+                ),
+                minQuantityWholesale:
+                  parsedMinQuantityWholesale,
               }
             : detail,
         ),
@@ -377,22 +597,25 @@ export function PurchaseFormDialog({
           categoryId,
           quantity: parsedQuantity,
           unitPrice: roundMoney(parsedPrice),
-          priceNormal: Number(priceNormal),
-          priceCamino: Number(priceCamino),
-          priceEspecial: Number(priceEspecial),
-          priceMayorista:
-            priceMayorista === '' ? null : Number(priceMayorista),
-            minQuantityWholesale:
-            minQuantityWholesale === ''
-              ? null
-            : Number(minQuantityWholesale),
-          },
+          priceNormal: roundMoney(
+            parsedPriceNormal,
+          ),
+          priceCamino: roundMoney(
+            parsedPriceCamino,
+          ),
+          priceEspecial: roundMoney(
+            parsedPriceEspecial,
+          ),
+          priceMayorista: roundMoney(
+            parsedPriceMayorista,
+          ),
+          minQuantityWholesale:
+            parsedMinQuantityWholesale,
+        },
       ]);
     }
 
-    setProductId('');
-    setQuantity(1);
-    setUnitPrice('');
+    resetProductFields();
   };
 
   const updateDetail = (
@@ -412,6 +635,24 @@ export function PurchaseFormDialog({
                 value === ''
                   ? 0
                   : numericValue,
+            }
+          : detail,
+      ),
+    );
+  };
+
+  const updateSalePrice = (
+    productIdToUpdate: string,
+    field: SalePriceField,
+    value: string,
+  ) => {
+    setDetails((current) =>
+      current.map((detail) =>
+        detail.productId === productIdToUpdate
+          ? {
+              ...detail,
+              [field]:
+                value === '' ? null : Number(value),
             }
           : detail,
       ),
@@ -443,12 +684,19 @@ export function PurchaseFormDialog({
     const invalid = details.some(
       (detail) =>
         detail.quantity <= 0 ||
-        detail.unitPrice <= 0,
+        detail.unitPrice <= 0 ||
+        detail.priceNormal <= 0 ||
+        detail.priceCamino <= 0 ||
+        detail.priceEspecial <= 0 ||
+        !detail.priceMayorista ||
+        detail.priceMayorista <= 0 ||
+        !detail.minQuantityWholesale ||
+        detail.minQuantityWholesale <= 0,
     );
 
     if (invalid) {
       setLocalError(
-        'Todos los productos deben tener cantidad y precio mayores a cero',
+        'Todos los productos deben tener cantidades y precios válidos',
       );
       return;
     }
@@ -524,7 +772,7 @@ export function PurchaseFormDialog({
               display: 'grid',
               gridTemplateColumns: {
                 xs: '1fr',
-                md: '1.4fr 1.3fr 2fr 1fr 1fr auto',
+                md: '1.4fr 1.3fr 2fr 1fr 1fr',
               },
               gap: 1.5,
               alignItems: 'center',
@@ -636,23 +884,168 @@ export function PurchaseFormDialog({
               label="Precio compra"
               value={unitPrice}
               onChange={(event) =>
-                setUnitPrice(
-                  event.target.value === ''
-                    ? ''
-                    : Number(
-                        event.target.value,
-                      ),
+                handleUnitPriceChange(
+                  event.target.value,
                 )
               }
               inputProps={decimalInputProps}
               disabled={loading}
             />
+          </Box>
 
+          {selectedProduct && (
+            <Box
+              sx={{
+                mt: 2,
+                pt: 2,
+                borderTop: '1px solid #e5e7eb',
+              }}
+            >
+              <Typography fontWeight={800}>
+                Precios de venta propuestos
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1 }}
+              >
+                Ajusta el porcentaje general o modifica cada
+                precio manualmente.
+              </Typography>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    md: '220px 1fr',
+                  },
+                  gap: 2,
+                  alignItems: 'center',
+                  mb: 2,
+                }}
+              >
+                <Typography fontWeight={700}>
+                  Aumento: {marginPercentage}%
+                </Typography>
+                <Slider
+                  value={marginPercentage}
+                  min={0}
+                  max={100}
+                  step={1}
+                  valueLabelDisplay="auto"
+                  onChange={(_event, value) =>
+                    handleMarginChange(
+                      Array.isArray(value)
+                        ? value[0]
+                        : value,
+                    )
+                  }
+                  disabled={loading}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, 1fr)',
+                    md: 'repeat(5, 1fr)',
+                  },
+                  gap: 1.5,
+                }}
+              >
+                <TextField
+                  type="number"
+                  label="Precio Normal"
+                  value={priceNormal}
+                  onChange={(event) =>
+                    setPriceNormal(
+                      event.target.value === ''
+                        ? ''
+                        : Number(event.target.value),
+                    )
+                  }
+                  inputProps={decimalInputProps}
+                  disabled={loading}
+                />
+                <TextField
+                  type="number"
+                  label="Precio Camino"
+                  value={priceCamino}
+                  onChange={(event) =>
+                    setPriceCamino(
+                      event.target.value === ''
+                        ? ''
+                        : Number(event.target.value),
+                    )
+                  }
+                  inputProps={decimalInputProps}
+                  disabled={loading}
+                />
+                <TextField
+                  type="number"
+                  label="Precio Especial"
+                  value={priceEspecial}
+                  onChange={(event) =>
+                    setPriceEspecial(
+                      event.target.value === ''
+                        ? ''
+                        : Number(event.target.value),
+                    )
+                  }
+                  inputProps={decimalInputProps}
+                  disabled={loading}
+                />
+                <TextField
+                  type="number"
+                  label="Precio Mayorista"
+                  value={priceMayorista}
+                  onChange={(event) =>
+                    setPriceMayorista(
+                      event.target.value === ''
+                        ? ''
+                        : Number(event.target.value),
+                    )
+                  }
+                  inputProps={decimalInputProps}
+                  disabled={loading}
+                />
+                <TextField
+                  type="number"
+                  label="Cantidad mín. mayorista"
+                  value={minQuantityWholesale}
+                  onChange={(event) =>
+                    setMinQuantityWholesale(
+                      event.target.value === ''
+                        ? ''
+                        : Number(event.target.value),
+                    )
+                  }
+                  inputProps={{
+                    min: 1,
+                    step: 1,
+                    inputMode: 'numeric',
+                  }}
+                  disabled={loading}
+                />
+              </Box>
+            </Box>
+          )}
+
+          <Box
+            sx={{
+              mt: 2,
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+          >
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddProduct}
-              disabled={loading}
+              disabled={loading || !selectedProduct}
             >
               Agregar
             </Button>
@@ -739,94 +1132,131 @@ export function PurchaseFormDialog({
                             );
 
                           return (
-                            <Box
+                            <Paper
                               key={
                                 detail.productId
                               }
+                              variant="outlined"
                               sx={{
-                                display:
-                                  'grid',
-                                gridTemplateColumns:
-                                  {
+                                p: 1.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: {
                                     xs: '1fr',
                                     md: '2fr 1fr 1fr 1fr auto',
                                   },
-                                gap: 1,
-                                alignItems:
-                                  'center',
-                              }}
-                            >
-                              <Typography
-                                fontWeight={700}
+                                  gap: 1,
+                                  alignItems: 'center',
+                                }}
                               >
-                                {product?.name ||
-                                  detail.productId}
-                              </Typography>
+                                <Typography fontWeight={700}>
+                                  {product?.name ||
+                                    detail.productId}
+                                </Typography>
 
-                              <TextField
-                                size="small"
-                                type="number"
-                                label="Cantidad"
-                                value={
-                                  detail.quantity
-                                }
-                                onChange={(
-                                  event,
-                                ) =>
-                                  updateDetail(
-                                    detail.productId,
-                                    'quantity',
-                                    event.target
-                                      .value,
-                                  )
-                                }
-                                inputProps={
-                                  decimalInputProps
-                                }
-                              />
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  label="Cantidad"
+                                  value={detail.quantity}
+                                  onChange={(event) =>
+                                    updateDetail(
+                                      detail.productId,
+                                      'quantity',
+                                      event.target.value,
+                                    )
+                                  }
+                                  inputProps={decimalInputProps}
+                                />
 
-                              <TextField
-                                size="small"
-                                type="number"
-                                label="P. unitario"
-                                value={
-                                  detail.unitPrice
-                                }
-                                onChange={(
-                                  event,
-                                ) =>
-                                  updateDetail(
-                                    detail.productId,
-                                    'unitPrice',
-                                    event.target
-                                      .value,
-                                  )
-                                }
-                                inputProps={
-                                  decimalInputProps
-                                }
-                              />
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  label="P. compra"
+                                  value={detail.unitPrice}
+                                  onChange={(event) =>
+                                    updateDetail(
+                                      detail.productId,
+                                      'unitPrice',
+                                      event.target.value,
+                                    )
+                                  }
+                                  inputProps={decimalInputProps}
+                                />
 
-                              <Typography
-                                fontWeight={800}
+                                <Typography fontWeight={800}>
+                                  {formatCurrency(
+                                    detail.quantity *
+                                      detail.unitPrice,
+                                  )}
+                                </Typography>
+
+                                <IconButton
+                                  color="error"
+                                  onClick={() =>
+                                    removeDetail(
+                                      detail.productId,
+                                    )
+                                  }
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </Box>
+
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: {
+                                    xs: '1fr',
+                                    sm: 'repeat(2, 1fr)',
+                                    md: 'repeat(5, 1fr)',
+                                  },
+                                  gap: 1,
+                                  mt: 1.5,
+                                }}
                               >
-                                {formatCurrency(
-                                  detail.quantity *
-                                    detail.unitPrice,
-                                )}
-                              </Typography>
-
-                              <IconButton
-                                color="error"
-                                onClick={() =>
-                                  removeDetail(
-                                    detail.productId,
-                                  )
-                                }
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Box>
+                                {(
+                                  [
+                                    ['priceNormal', 'P. Normal'],
+                                    ['priceCamino', 'P. Camino'],
+                                    ['priceEspecial', 'P. Especial'],
+                                    ['priceMayorista', 'P. Mayorista'],
+                                    [
+                                      'minQuantityWholesale',
+                                      'Cant. mín. mayorista',
+                                    ],
+                                  ] as const
+                                ).map(([field, label]) => (
+                                  <TextField
+                                    key={field}
+                                    size="small"
+                                    type="number"
+                                    label={label}
+                                    value={detail[field] ?? ''}
+                                    onChange={(event) =>
+                                      updateSalePrice(
+                                        detail.productId,
+                                        field,
+                                        event.target.value,
+                                      )
+                                    }
+                                    inputProps={
+                                      field ===
+                                      'minQuantityWholesale'
+                                        ? {
+                                            min: 1,
+                                            step: 1,
+                                            inputMode: 'numeric',
+                                          }
+                                        : decimalInputProps
+                                    }
+                                  />
+                                ))}
+                              </Box>
+                            </Paper>
                           );
                         },
                       )}
