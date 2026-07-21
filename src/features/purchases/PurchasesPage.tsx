@@ -335,7 +335,7 @@ function isDateInsideRange(
 
   if (dateTo) {
     const maximumDate = new Date(
-      `${dateTo}T23:59:59`,
+      `${dateTo}T23:59:59.999`,
     );
 
     if (currentDate > maximumDate) {
@@ -1179,9 +1179,15 @@ export function PurchasesPage() {
               onChange={(event) =>
                 setDateFrom(event.target.value)
               }
-              InputLabelProps={{
-                shrink: true,
+              slotProps={{
+                inputLabel: {
+                  shrink: true,
+                },
+                htmlInput: {
+                  max: dateTo || undefined,
+                },
               }}
+              sx={{ minWidth: 150 }}
             />
 
             <TextField
@@ -1192,9 +1198,15 @@ export function PurchasesPage() {
               onChange={(event) =>
                 setDateTo(event.target.value)
               }
-              InputLabelProps={{
-                shrink: true,
+              slotProps={{
+                inputLabel: {
+                  shrink: true,
+                },
+                htmlInput: {
+                  min: dateFrom || undefined,
+                },
               }}
+              sx={{ minWidth: 150 }}
             />
 
             {hasFilters && (

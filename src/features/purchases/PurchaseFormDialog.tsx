@@ -1,5 +1,6 @@
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -182,6 +183,9 @@ export function PurchaseFormDialog({
     [products],
   );
 
+  const selectedProduct =
+    productMap.get(productId) || null;
+
   const groupedDetails = useMemo(() => {
     const groups = new Map<
       string,
@@ -300,11 +304,9 @@ export function PurchaseFormDialog({
   };
 
   const handleProductChange = (
-    value: string,
+    product: Product | null,
   ) => {
-    setProductId(value);
-
-    const product = productMap.get(value);
+    setProductId(product?.id || '');
 
     setUnitPrice(
       product?.purchasePrice ?? '',
@@ -564,37 +566,35 @@ export function PurchaseFormDialog({
               )}
             </TextField>
 
-            <TextField
-              select
-              label="Producto"
-              value={productId}
-              onChange={(event) =>
-                handleProductChange(
-                  event.target.value,
-                )
+            <Autocomplete
+              options={availableProducts}
+              value={selectedProduct}
+              onChange={(_event, product) =>
+                handleProductChange(product)
               }
+              getOptionLabel={(product) =>
+                `${product.name}${
+                  product.weight
+                    ? ` - ${product.weight}`
+                    : ''
+                }`
+              }
+              isOptionEqualToValue={(
+                option,
+                value,
+              ) => option.id === value.id}
+              noOptionsText="No se encontraron productos"
               disabled={
                 loading || !categoryId
               }
-            >
-              <MenuItem value="">
-                Seleccionar
-              </MenuItem>
-
-              {availableProducts.map(
-                (product) => (
-                  <MenuItem
-                    key={product.id}
-                    value={product.id}
-                  >
-                    {product.name}
-                    {product.weight
-                      ? ` - ${product.weight}`
-                      : ''}
-                  </MenuItem>
-                ),
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Buscar producto"
+                  placeholder="Escribe el nombre"
+                />
               )}
-            </TextField>
+            />
 
             <TextField
               type="number"
@@ -856,7 +856,9 @@ export function PurchaseFormDialog({
         <Button
           variant="contained"
           onClick={submitForm}
-          disabled={loading}
+          disabled={
+            loading || details.length === 0
+          }
         >
           {loading
             ? 'Guardando...'
