@@ -48,6 +48,11 @@ interface DraftDetail {
   categoryId: string;
   quantity: number;
   unitPrice: number;
+  priceNormal: number;
+  priceCamino: number;
+  priceEspecial: number;
+  priceMayorista: number | null;
+  minQuantityWholesale: number | null;
 }
 
 const decimalInputProps = {
@@ -371,9 +376,17 @@ export function PurchaseFormDialog({
           providerId,
           categoryId,
           quantity: parsedQuantity,
-          unitPrice:
-            roundMoney(parsedPrice),
-        },
+          unitPrice: roundMoney(parsedPrice),
+          priceNormal: Number(priceNormal),
+          priceCamino: Number(priceCamino),
+          priceEspecial: Number(priceEspecial),
+          priceMayorista:
+            priceMayorista === '' ? null : Number(priceMayorista),
+            minQuantityWholesale:
+            minQuantityWholesale === ''
+              ? null
+            : Number(minQuantityWholesale),
+          },
       ]);
     }
 
@@ -444,10 +457,15 @@ export function PurchaseFormDialog({
       observations:
         observations.trim() || undefined,
       details: details.map((detail) => ({
-        productId: detail.productId,
-        quantity: detail.quantity,
-        unitPrice: detail.unitPrice,
-      })),
+      productId: detail.productId,
+      quantity: detail.quantity,
+      unitPrice: detail.unitPrice,
+      priceNormal: detail.priceNormal,
+      priceCamino: detail.priceCamino,
+      priceEspecial: detail.priceEspecial,
+      priceMayorista: detail.priceMayorista,
+      minQuantityWholesale: detail.minQuantityWholesale,
+    })),
     });
   };
 
