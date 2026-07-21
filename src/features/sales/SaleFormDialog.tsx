@@ -13,6 +13,7 @@ import {
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 
@@ -26,9 +27,20 @@ import {
   useState,
 } from 'react';
 
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+
+import { createClient } from '../../api/clients.api';
+import { getLocations } from '../../api/locations.api';
+import { ClientFormDialog } from '../clients/ClientFormDialog';
+
 import type {
   Client,
   ClientType,
+  CreateClientRequest,
 } from '../../types/client.types';
 
 import type {
@@ -167,6 +179,55 @@ function getAvailableStock(
   );
 }
 
+function getErrorMessage(error: unknown) {
+  const requestError = error as {
+    response?: {
+      status?: number;
+      data?: {
+        message?: string | string[];
+        error?: string;
+      };
+    };
+    code?: string;
+    message?: string;
+  };
+
+  const message =
+    requestError.response?.data?.message;
+
+  if (Array.isArray(message)) {
+    return message.join(', ');
+  }
+
+  if (typeof message === 'string') {
+    return message;
+  }
+
+  const errorText =
+    requestError.response?.data?.error;
+
+  if (typeof errorText === 'string') {
+    return errorText;
+  }
+
+  if (requestError.code === 'ERR_NETWORK') {
+    return 'No se pudo conectar con el backend.';
+  }
+
+  if (requestError.response?.status === 403) {
+    return 'No tienes permiso para crear clientes.';
+  }
+
+  if (requestError.response?.status === 401) {
+    return 'Tu sesión expiró.';
+  }
+
+  return (
+    requestError.message ||
+    'No se pudo crear el cliente.'
+  );
+}
+
 export function SaleFormDialog({
   open,
   sale,
@@ -183,8 +244,16 @@ export function SaleFormDialog({
   const isAdmin =
     userRole === 'ADMIN';
 
+  const queryClient = useQueryClient();
+
   const [clientId, setClientId] =
     useState('');
+
+  const [clientDialogOpen, setClientDialogOpen] =
+    useState(false);
+
+  const [clientFormError, setClientFormError] =
+    useState<string | null>(null);
 
   const [saleModality, setSaleModality] =
     useState<SaleModality>(
@@ -244,6 +313,79 @@ export function SaleFormDialog({
       ) || null,
     [clients, clientId],
   );
+
+  const {
+    data: locations = [],
+    isError: locationsIsError,
+    error: locationsError,
+  } = useQuery({
+    queryKey: ['locations'],
+    queryFn: getLocations,
+    enabled: clientDialogOpen,
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: createClient,
+    onSuccess: (newClient) => {
+      queryClient.setQueryData<Client[]>(
+        ['clients'],
+        (currentClients = []) => {
+          if (
+            currentClients.some(
+              (client) =>
+                client.id === newClient.id,
+            )
+          ) {
+            return currentClients;
+          }
+
+          return [
+            ...currentClients,
+            newClient,
+          ];
+        },
+      );
+
+      queryClient.invalidateQueries({
+        queryKey: ['clients'],
+      });
+
+      setClientId(newClient.id);
+
+      const draftProduct = products.find(
+        (product) =>
+          product.id === productId,
+      );
+
+      if (
+        draftProduct &&
+        !manualDraftPrice
+      ) {
+        const parsedQuantity =
+          Number(quantity);
+
+        setUnitPrice(
+          getAutomaticPrice(
+            draftProduct,
+            newClient.type,
+            Number.isInteger(
+              parsedQuantity,
+            ) && parsedQuantity > 0
+              ? parsedQuantity
+              : 1,
+          ),
+        );
+      }
+
+      setClientDialogOpen(false);
+      setClientFormError(null);
+    },
+    onError: (mutationError) => {
+      setClientFormError(
+        getErrorMessage(mutationError),
+      );
+    },
+  });
 
   const clientType: ClientType =
     selectedClient?.type || 'NORMAL';
@@ -413,6 +555,8 @@ export function SaleFormDialog({
     setUnitPrice(0);
     setManualDraftPrice(false);
     setLocalError(null);
+    setClientDialogOpen(false);
+    setClientFormError(null);
   }, [open, sale]);
 
   useEffect(() => {
@@ -952,14 +1096,15 @@ export function SaleFormDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={
-        loading ? undefined : onClose
-      }
-      fullWidth
-      maxWidth="lg"
-    >
+    <>
+      <Dialog
+        open={open}
+        onClose={
+          loading ? undefined : onClose
+        }
+        fullWidth
+        maxWidth="lg"
+      >
       <DialogTitle>
         {sale
           ? 'Editar venta pendiente'
@@ -987,34 +1132,66 @@ export function SaleFormDialog({
             mb: 3,
           }}
         >
-          <TextField
-            select
-            fullWidth
-            label="Cliente"
-            value={clientId}
-            onChange={(event) =>
-              handleClientChange(
-                event.target.value,
-              )
-            }
-            disabled={loading}
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1,
+              alignItems: 'flex-start',
+            }}
           >
-            <MenuItem value="">
-              Seleccionar cliente
-            </MenuItem>
+            <Autocomplete
+              fullWidth
+              options={clients}
+              value={selectedClient}
+              onChange={(_event, client) =>
+                handleClientChange(
+                  client?.id || '',
+                )
+              }
+              getOptionLabel={(client) =>
+                client.alias
+                  ? `${client.fullName} - ${client.alias}`
+                  : client.fullName
+              }
+              isOptionEqualToValue={(
+                option,
+                value,
+              ) => option.id === value.id}
+              noOptionsText="No se encontraron clientes"
+              disabled={loading}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Cliente"
+                  placeholder="Escribe el nombre o alias"
+                />
+              )}
+            />
 
-            {clients.map((client) => (
-              <MenuItem
-                key={client.id}
-                value={client.id}
-              >
-                {client.fullName}
-                {client.alias
-                  ? ` - ${client.alias}`
-                  : ''}
-              </MenuItem>
-            ))}
-          </TextField>
+            <Tooltip title="Crear nuevo cliente">
+              <span>
+                <IconButton
+                  color="primary"
+                  aria-label="Crear nuevo cliente"
+                  onClick={() => {
+                    setClientFormError(null);
+                    setClientDialogOpen(true);
+                  }}
+                  disabled={loading}
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    border: 1,
+                    borderColor: 'primary.main',
+                    borderRadius: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <AddIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
 
           <TextField
             select
@@ -1681,7 +1858,28 @@ export function SaleFormDialog({
               : 'Registrar venta'}
         </Button>
       </DialogActions>
-    </Dialog>
+      </Dialog>
+
+      <ClientFormDialog
+        open={clientDialogOpen}
+        locations={locations}
+        loading={createClientMutation.isPending}
+        error={
+          clientFormError ||
+          (locationsIsError
+            ? getErrorMessage(locationsError)
+            : null)
+        }
+        onClose={() => {
+          setClientDialogOpen(false);
+          setClientFormError(null);
+        }}
+        onSubmit={(data: CreateClientRequest) => {
+          setClientFormError(null);
+          createClientMutation.mutate(data);
+        }}
+      />
+    </>
   );
 }
 
