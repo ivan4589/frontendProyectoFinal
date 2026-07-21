@@ -1,5 +1,6 @@
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -69,6 +70,11 @@ interface DraftSaleDetail {
   unitPrice: number;
   manualPrice: boolean;
 }
+
+type SaleModality =
+  | 'PENDING_PAYMENT'
+  | 'CASH'
+  | 'CREDIT';
 
 const paymentMethods: Array<{
   value: PaymentMethod;
@@ -180,8 +186,10 @@ export function SaleFormDialog({
   const [clientId, setClientId] =
     useState('');
 
-  const [saleType, setSaleType] =
-    useState<SaleType>('CASH');
+  const [saleModality, setSaleModality] =
+    useState<SaleModality>(
+      'PENDING_PAYMENT',
+    );
 
   const [dueDate, setDueDate] =
     useState('');
@@ -220,6 +228,12 @@ export function SaleFormDialog({
   const [quantity, setQuantity] =
     useState<number | ''>(1);
 
+  const [unitPrice, setUnitPrice] =
+    useState<number | ''>(0);
+
+  const [manualDraftPrice, setManualDraftPrice] =
+    useState(false);
+
   const [localError, setLocalError] =
     useState<string | null>(null);
 
@@ -244,6 +258,9 @@ export function SaleFormDialog({
       ),
     [products],
   );
+
+  const selectedProduct =
+    productMap.get(productId) || null;
 
   const previousQuantityMap = useMemo(
     () =>
@@ -349,8 +366,13 @@ export function SaleFormDialog({
     }
 
     setClientId(sale?.clientId || '');
-    setSaleType(
-      sale?.saleType || 'CASH',
+    setSaleModality(
+      sale?.saleType === 'CREDIT'
+        ? 'CREDIT'
+        : sale &&
+            sale.paidAmount >= sale.total
+          ? 'CASH'
+          : 'PENDING_PAYMENT',
     );
 
     setDueDate(
@@ -388,6 +410,8 @@ export function SaleFormDialog({
     setSubCategoryId('');
     setProductId('');
     setQuantity(1);
+    setUnitPrice(0);
+    setManualDraftPrice(false);
     setLocalError(null);
   }, [open, sale]);
 
@@ -395,14 +419,23 @@ export function SaleFormDialog({
     if (
       open &&
       !sale &&
-      saleType === 'CASH'
+      saleModality === 'CASH'
     ) {
       setInitialPayment(total);
+    }
+
+    if (
+      open &&
+      !sale &&
+      saleModality ===
+        'PENDING_PAYMENT'
+    ) {
+      setInitialPayment(0);
     }
   }, [
     open,
     sale,
-    saleType,
+    saleModality,
     total,
   ]);
 
@@ -417,7 +450,29 @@ export function SaleFormDialog({
     );
 
     if (!newClient) {
+      setUnitPrice(0);
+      setManualDraftPrice(false);
       return;
+    }
+
+    if (
+      selectedProduct &&
+      !manualDraftPrice
+    ) {
+      const parsedQuantity =
+        Number(quantity);
+
+      setUnitPrice(
+        getAutomaticPrice(
+          selectedProduct,
+          newClient.type,
+          Number.isInteger(
+            parsedQuantity,
+          ) && parsedQuantity > 0
+            ? parsedQuantity
+            : 1,
+        ),
+      );
     }
 
     setDetails((current) =>
@@ -446,11 +501,76 @@ export function SaleFormDialog({
     );
   };
 
+  const handleProductChange = (
+    product: Product | null,
+  ) => {
+    setProductId(product?.id || '');
+    setManualDraftPrice(false);
+
+    if (!product || !selectedClient) {
+      setUnitPrice(0);
+      return;
+    }
+
+    const parsedQuantity =
+      Number(quantity);
+
+    setUnitPrice(
+      getAutomaticPrice(
+        product,
+        selectedClient.type,
+        Number.isInteger(parsedQuantity) &&
+          parsedQuantity > 0
+          ? parsedQuantity
+          : 1,
+      ),
+    );
+  };
+
+  const handleDraftQuantityChange = (
+    value: string,
+  ) => {
+    const nextQuantity =
+      value === '' ? '' : Number(value);
+
+    setQuantity(nextQuantity);
+
+    if (
+      manualDraftPrice ||
+      !selectedProduct ||
+      !selectedClient
+    ) {
+      return;
+    }
+
+    const parsedQuantity =
+      Number(nextQuantity);
+
+    if (
+      !Number.isInteger(parsedQuantity) ||
+      parsedQuantity <= 0
+    ) {
+      setUnitPrice(0);
+      return;
+    }
+
+    setUnitPrice(
+      getAutomaticPrice(
+        selectedProduct,
+        selectedClient.type,
+        parsedQuantity,
+      ),
+    );
+  };
+
   const handleAddProduct = () => {
     setLocalError(null);
 
     const parsedQuantity =
       Number(quantity);
+
+    const parsedUnitPrice =
+      Number(unitPrice);
 
     if (!clientId) {
       setLocalError(
@@ -472,6 +592,17 @@ export function SaleFormDialog({
     ) {
       setLocalError(
         'La cantidad debe ser un número entero mayor a cero',
+      );
+      return;
+    }
+
+    if (
+      unitPrice === '' ||
+      !Number.isFinite(parsedUnitPrice) ||
+      parsedUnitPrice < 0
+    ) {
+      setLocalError(
+        'El precio unitario debe ser mayor o igual a cero',
       );
       return;
     }
@@ -522,17 +653,17 @@ export function SaleFormDialog({
       {
         productId,
         quantity: parsedQuantity,
-        unitPrice: getAutomaticPrice(
-          product,
-          clientType,
-          parsedQuantity,
+        unitPrice: roundMoney(
+          parsedUnitPrice,
         ),
-        manualPrice: false,
+        manualPrice: manualDraftPrice,
       },
     ]);
 
     setProductId('');
     setQuantity(1);
+    setUnitPrice(0);
+    setManualDraftPrice(false);
   };
 
   const handleQuantityChange = (
@@ -712,7 +843,7 @@ export function SaleFormDialog({
     }
 
     if (
-      saleType === 'CREDIT' &&
+      saleModality === 'CREDIT' &&
       !dueDate
     ) {
       setLocalError(
@@ -721,12 +852,32 @@ export function SaleFormDialog({
       return;
     }
 
-    const numericInitialPayment =
-      sale
-        ? undefined
-        : initialPayment === ''
-          ? 0
-          : Number(initialPayment);
+    const numericInitialPayment = sale
+      ? undefined
+      : saleModality ===
+          'PENDING_PAYMENT'
+        ? 0
+        : saleModality === 'CASH'
+          ? total
+          : initialPayment === ''
+            ? 0
+            : Number(initialPayment);
+
+    const backendSaleType: SaleType =
+      saleModality === 'CREDIT'
+        ? 'CREDIT'
+        : 'CASH';
+
+    if (
+      numericInitialPayment !==
+        undefined &&
+      numericInitialPayment < 0
+    ) {
+      setLocalError(
+        'El pago inicial no puede ser negativo',
+      );
+      return;
+    }
 
     if (
       numericInitialPayment !==
@@ -775,10 +926,10 @@ export function SaleFormDialog({
         observations.trim() ||
         undefined,
 
-      saleType,
+      saleType: backendSaleType,
 
       dueDate:
-        saleType === 'CREDIT'
+        saleModality === 'CREDIT'
           ? dueDate
           : undefined,
 
@@ -792,8 +943,11 @@ export function SaleFormDialog({
           : undefined,
 
       paymentReference:
-        paymentReference.trim() ||
-        undefined,
+        numericInitialPayment &&
+        numericInitialPayment > 0
+          ? paymentReference.trim() ||
+            undefined
+          : undefined,
     });
   };
 
@@ -866,22 +1020,47 @@ export function SaleFormDialog({
             select
             fullWidth
             label="Modalidad"
-            value={saleType}
+            value={saleModality}
             onChange={(event) => {
-              const newType =
+              const newModality =
                 event.target
-                  .value as SaleType;
+                  .value as SaleModality;
 
-              setSaleType(newType);
+              setSaleModality(
+                newModality,
+              );
 
               if (
-                newType === 'CASH'
+                newModality !== 'CREDIT'
               ) {
                 setDueDate('');
+              }
+
+              if (
+                newModality ===
+                'PENDING_PAYMENT'
+              ) {
+                setInitialPayment(0);
+              }
+
+              if (
+                newModality === 'CASH'
+              ) {
+                setInitialPayment(total);
+              }
+
+              if (
+                newModality === 'CREDIT'
+              ) {
+                setInitialPayment(0);
               }
             }}
             disabled={loading}
           >
+            <MenuItem value="PENDING_PAYMENT">
+              Por Cobrar
+            </MenuItem>
+
             <MenuItem value="CASH">
               Contado
             </MenuItem>
@@ -891,7 +1070,7 @@ export function SaleFormDialog({
             </MenuItem>
           </TextField>
 
-          {saleType === 'CREDIT' && (
+          {saleModality === 'CREDIT' && (
             <TextField
               fullWidth
               type="date"
@@ -949,7 +1128,7 @@ export function SaleFormDialog({
               display: 'grid',
               gridTemplateColumns: {
                 xs: '1fr',
-                md: '1fr 1fr 2fr 1fr auto',
+                md: '1fr 1fr 2fr 0.8fr 1fr auto',
               },
               gap: 1.5,
               alignItems: 'center',
@@ -966,6 +1145,8 @@ export function SaleFormDialog({
 
                 setSubCategoryId('');
                 setProductId('');
+                setUnitPrice(0);
+                setManualDraftPrice(false);
               }}
               disabled={loading}
             >
@@ -995,6 +1176,8 @@ export function SaleFormDialog({
                 );
 
                 setProductId('');
+                setUnitPrice(0);
+                setManualDraftPrice(false);
               }}
               disabled={
                 loading || !categoryId
@@ -1020,59 +1203,47 @@ export function SaleFormDialog({
               )}
             </TextField>
 
-            <TextField
-              select
-              label="Producto"
-              value={productId}
-              onChange={(event) =>
-                setProductId(
-                  event.target.value,
-                )
+            <Autocomplete
+              options={availableProducts}
+              value={selectedProduct}
+              onChange={(_event, product) =>
+                handleProductChange(product)
               }
+              getOptionLabel={(product) => {
+                const available =
+                  getAvailableStock(
+                    product,
+                    previousQuantityMap.get(
+                      product.id,
+                    ) || 0,
+                  );
+
+                return `${product.name} — Disponible: ${available}`;
+              }}
+              isOptionEqualToValue={(
+                option,
+                value,
+              ) => option.id === value.id}
+              noOptionsText="No se encontraron productos"
               disabled={
                 loading || !clientId
               }
-            >
-              <MenuItem value="">
-                Seleccionar producto
-              </MenuItem>
-
-              {availableProducts.map(
-                (product) => {
-                  const available =
-                    getAvailableStock(
-                      product,
-                      previousQuantityMap.get(
-                        product.id,
-                      ) || 0,
-                    );
-
-                  return (
-                    <MenuItem
-                      key={product.id}
-                      value={product.id}
-                    >
-                      {product.name} — Disponible:{' '}
-                      {available}
-                    </MenuItem>
-                  );
-                },
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Buscar producto"
+                  placeholder="Escribe el nombre"
+                />
               )}
-            </TextField>
+            />
 
             <TextField
               type="number"
               label="Cantidad"
               value={quantity}
               onChange={(event) =>
-                setQuantity(
-                  event.target.value ===
-                    ''
-                    ? ''
-                    : Number(
-                        event.target
-                          .value,
-                      ),
+                handleDraftQuantityChange(
+                  event.target.value,
                 )
               }
               inputProps={{
@@ -1080,6 +1251,32 @@ export function SaleFormDialog({
                 step: 1,
               }}
               disabled={loading}
+            />
+
+            <TextField
+              type="number"
+              label="Precio unitario"
+              value={unitPrice}
+              onChange={(event) => {
+                setUnitPrice(
+                  event.target.value === ''
+                    ? ''
+                    : Number(
+                        event.target.value,
+                      ),
+                );
+
+                setManualDraftPrice(true);
+              }}
+              slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 'any',
+                },
+              }}
+              disabled={
+                loading || !productId
+              }
             />
 
             <Button
@@ -1391,10 +1588,13 @@ export function SaleFormDialog({
                       step: 'any',
                     }}
                     disabled={
-                      saleType === 'CASH'
+                      saleModality !== 'CREDIT'
                     }
                     helperText={
-                      saleType === 'CASH'
+                      saleModality ===
+                      'PENDING_PAYMENT'
+                        ? 'La venta quedará pendiente de cobro.'
+                        : saleModality === 'CASH'
                         ? 'En ventas al contado se registra el total.'
                         : 'Puede registrar un pago parcial o dejarlo en cero.'
                     }
