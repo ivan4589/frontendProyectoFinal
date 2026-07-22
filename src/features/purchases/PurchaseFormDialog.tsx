@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Provider } from '../../types/provider.types';
 import type {
   Category,
@@ -37,13 +37,17 @@ interface PurchaseFormDialogProps {
   products: Product[];
   loading?: boolean;
   error?: string | null;
+  canCreateProduct?: boolean;
+  initialDraft?: PurchaseFormDraft | null;
+  createdProductId?: string | null;
   onClose: () => void;
+  onCreateNewProduct?: (draft: PurchaseFormDraft) => void;
   onSubmit: (
     data: CreatePurchaseRequest,
   ) => void;
 }
 
-interface DraftDetail {
+export interface DraftDetail {
   productId: string;
   providerId: string;
   categoryId: string;
@@ -54,6 +58,35 @@ interface DraftDetail {
   priceEspecial: number;
   priceMayorista: number | null;
   minQuantityWholesale: number | null;
+}
+
+export interface PurchaseFormDraft {
+  observations: string;
+  details: DraftDetail[];
+  providerId: string;
+  categoryId: string;
+  productId: string;
+  quantity: number | '';
+  unitPrice: number | '';
+  marginPercentage: number;
+  priceNormal: number | '';
+  priceCamino: number | '';
+  priceEspecial: number | '';
+  priceMayorista: number | '';
+  minQuantityWholesale: number | '';
+}
+
+export interface CreateProductFromPurchaseState {
+  fromPurchase: true;
+  purchaseDraft: PurchaseFormDraft;
+  purchaseId: string | null;
+}
+
+export interface ReturnToPurchaseState {
+  returnToPurchase: true;
+  purchaseDraft: PurchaseFormDraft;
+  purchaseId: string | null;
+  createdProductId: string | null;
 }
 
 type SalePriceField =
@@ -113,9 +146,14 @@ export function PurchaseFormDialog({
   products,
   loading = false,
   error,
+  canCreateProduct = false,
+  initialDraft,
+  createdProductId,
   onClose,
+  onCreateNewProduct,
   onSubmit,
 }: PurchaseFormDialogProps) {
+  const initializedOpenRef = useRef(false);
   const [observations, setObservations] =
     useState('');
   const [details, setDetails] = useState<
@@ -149,7 +187,70 @@ export function PurchaseFormDialog({
     useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedOpenRef.current = false;
+      return;
+    }
+
+    if (initializedOpenRef.current) {
+      return;
+    }
+
+    initializedOpenRef.current = true;
+
+    if (initialDraft) {
+      setObservations(initialDraft.observations);
+      setDetails(initialDraft.details);
+      setProviderId(initialDraft.providerId);
+      setCategoryId(initialDraft.categoryId);
+      setProductId(initialDraft.productId);
+      setQuantity(initialDraft.quantity);
+      setUnitPrice(initialDraft.unitPrice);
+      setMarginPercentage(initialDraft.marginPercentage);
+      setPriceNormal(initialDraft.priceNormal);
+      setPriceCamino(initialDraft.priceCamino);
+      setPriceEspecial(initialDraft.priceEspecial);
+      setPriceMayorista(initialDraft.priceMayorista);
+      setMinQuantityWholesale(
+        initialDraft.minQuantityWholesale,
+      );
+
+      if (createdProductId) {
+        const createdProduct = products.find(
+          (product) => product.id === createdProductId,
+        );
+
+        if (createdProduct) {
+          const currentMargin = calculateMargin(
+            createdProduct.purchasePrice,
+            createdProduct.priceNormal,
+          );
+
+          setProviderId(createdProduct.providerId);
+          setCategoryId(createdProduct.categoryId);
+          setProductId(createdProduct.id);
+          setQuantity(1);
+          setUnitPrice(createdProduct.purchasePrice);
+          setMarginPercentage(currentMargin);
+          setPriceNormal(createdProduct.priceNormal);
+          setPriceCamino(createdProduct.priceCamino);
+          setPriceEspecial(createdProduct.priceEspecial);
+          setPriceMayorista(
+            createdProduct.priceMayorista ??
+              calculatePrice(
+                createdProduct.purchasePrice,
+                currentMargin,
+              ),
+          );
+          setMinQuantityWholesale(
+            createdProduct.minQuantityWholesale ?? 1,
+          );
+        }
+      }
+
+      setLocalError(null);
+      return;
+    }
 
     setObservations(
       purchase?.observations || '',
@@ -210,7 +311,13 @@ export function PurchaseFormDialog({
     setPriceMayorista('');
     setMinQuantityWholesale('');
     setLocalError(null);
-  }, [open, purchase]);
+  }, [
+    open,
+    purchase,
+    initialDraft,
+    createdProductId,
+    products,
+  ]);
 
   const providerProducts = useMemo(
     () =>
@@ -303,6 +410,22 @@ export function PurchaseFormDialog({
     setPriceMayorista('');
     setMinQuantityWholesale('');
   };
+
+  const createCurrentDraft = (): PurchaseFormDraft => ({
+    observations,
+    details,
+    providerId,
+    categoryId,
+    productId,
+    quantity,
+    unitPrice,
+    marginPercentage,
+    priceNormal,
+    priceCamino,
+    priceEspecial,
+    priceMayorista,
+    minQuantityWholesale,
+  });
 
   const groupedDetails = useMemo(() => {
     const groups = new Map<
@@ -705,15 +828,15 @@ export function PurchaseFormDialog({
       observations:
         observations.trim() || undefined,
       details: details.map((detail) => ({
-      productId: detail.productId,
-      quantity: detail.quantity,
-      unitPrice: detail.unitPrice,
-      priceNormal: detail.priceNormal,
-      priceCamino: detail.priceCamino,
-      priceEspecial: detail.priceEspecial,
-      priceMayorista: detail.priceMayorista,
-      minQuantityWholesale: detail.minQuantityWholesale,
-    })),
+        productId: detail.productId,
+        quantity: detail.quantity,
+        unitPrice: detail.unitPrice,
+        priceNormal: detail.priceNormal,
+        priceCamino: detail.priceCamino,
+        priceEspecial: detail.priceEspecial,
+        priceMayorista: detail.priceMayorista,
+        minQuantityWholesale: detail.minQuantityWholesale,
+      })),
     });
   };
 
@@ -755,13 +878,43 @@ export function PurchaseFormDialog({
           sx={{ mb: 3 }}
         />
 
-        <Typography
-          variant="h6"
-          fontWeight={800}
-          sx={{ mb: 1.5 }}
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          sx={{
+            mb: 1.5,
+            justifyContent: 'space-between',
+            alignItems: {
+              xs: 'stretch',
+              sm: 'center',
+            },
+          }}
         >
-          Agregar producto
-        </Typography>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 800 }}
+          >
+            Agregar producto a la compra
+          </Typography>
+
+          {canCreateProduct && onCreateNewProduct && (
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() =>
+                onCreateNewProduct(createCurrentDraft())
+              }
+              disabled={loading}
+              sx={{
+                fontWeight: 800,
+                textTransform: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Crea un nuevo Producto
+            </Button>
+          )}
+        </Stack>
 
         <Paper
           variant="outlined"

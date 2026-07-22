@@ -29,8 +29,9 @@ import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import SearchIcon from "@mui/icons-material/Search";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getProviders } from "../../api/providers.api";
 import {
   createProduct,
@@ -66,6 +67,10 @@ import { ProductFormDialog } from "./ProductFormDialog";
 import { CategoriesDialog } from "./CategoriesDialog";
 import ImageIcon from "@mui/icons-material/Image";
 import { getImageUrl } from "../../utils/getImageUrl";
+import type {
+  CreateProductFromPurchaseState,
+  ReturnToPurchaseState,
+} from "../purchases/PurchaseFormDialog";
 
 function getErrorMessage(error: unknown) {
   const anyError = error as any;
@@ -161,8 +166,15 @@ function getStockStatus(product: Product) {
 
 export function ProductsPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const openedFromPurchaseRef = useRef(false);
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const purchaseNavigationState =
+    location.state as CreateProductFromPurchaseState | null;
+  const creatingFromPurchase =
+    purchaseNavigationState?.fromPurchase === true;
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -172,6 +184,42 @@ export function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productFormError, setProductFormError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !creatingFromPurchase ||
+      !isAdmin ||
+      openedFromPurchaseRef.current
+    ) {
+      return;
+    }
+
+    openedFromPurchaseRef.current = true;
+    setSelectedProduct(null);
+    setProductFormError(null);
+    setProductDialogOpen(true);
+  }, [creatingFromPurchase, isAdmin]);
+
+  const returnToPurchase = (
+    createdProductId: string | null,
+  ) => {
+    if (!purchaseNavigationState?.fromPurchase) {
+      return;
+    }
+
+    const returnState: ReturnToPurchaseState = {
+      returnToPurchase: true,
+      purchaseDraft:
+        purchaseNavigationState.purchaseDraft,
+      purchaseId: purchaseNavigationState.purchaseId,
+      createdProductId,
+    };
+
+    navigate("/purchases", {
+      replace: true,
+      state: returnState,
+    });
+  };
 
   const {
     data: products = [],
@@ -276,8 +324,23 @@ export function ProductsPage() {
 
   const createProductMutation = useMutation({
     mutationFn: createProduct,
-    onSuccess: () => {
+    onSuccess: (createdProduct) => {
+      queryClient.setQueryData<Product[]>(
+        ["products"],
+        (current = []) => [
+          ...current.filter(
+            (product) => product.id !== createdProduct.id,
+          ),
+          createdProduct,
+        ],
+      );
       queryClient.invalidateQueries({ queryKey: ["products"] });
+
+      if (creatingFromPurchase) {
+        returnToPurchase(createdProduct.id);
+        return;
+      }
+
       setProductDialogOpen(false);
       setSelectedProduct(null);
       setProductFormError(null);
@@ -394,6 +457,17 @@ export function ProductsPage() {
     setSelectedProduct(null);
     setProductFormError(null);
     setProductDialogOpen(true);
+  };
+
+  const handleCloseProductDialog = () => {
+    if (creatingFromPurchase) {
+      returnToPurchase(null);
+      return;
+    }
+
+    setProductDialogOpen(false);
+    setSelectedProduct(null);
+    setProductFormError(null);
   };
 
   const handleEditProduct = (product: Product) => {
@@ -895,11 +969,7 @@ export function ProductsPage() {
         subCategories={subCategories}
         loading={productLoading}
         error={productFormError}
-        onClose={() => {
-          setProductDialogOpen(false);
-          setSelectedProduct(null);
-          setProductFormError(null);
-        }}
+        onClose={handleCloseProductDialog}
         onSubmit={handleSubmitProduct}
       />
 

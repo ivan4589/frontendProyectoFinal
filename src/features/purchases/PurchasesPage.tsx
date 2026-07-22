@@ -42,20 +42,20 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SearchIcon from '@mui/icons-material/Search';
 import WarehouseIcon from '@mui/icons-material/Warehouse';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import {
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 
 import { getProviders } from '../../api/providers.api';
-import {
-  createProduct,
-  getProducts,
-} from '../../api/products.api';
+import { getProducts } from '../../api/products.api';
 import { getCategories } from '../../api/categories.api';
-import { getSubCategories } from '../../api/subCategories.api';
 
 import {
   cancelPurchase,
@@ -81,9 +81,12 @@ import type {
   PurchaseStatus,
   UpdatePurchaseRequest,
 } from '../../types/purchase.types';
-import type { Product } from '../../types/product.types';
-
 import { PurchaseFormDialog } from './PurchaseFormDialog';
+import type {
+  CreateProductFromPurchaseState,
+  PurchaseFormDraft,
+  ReturnToPurchaseState,
+} from './PurchaseFormDialog';
 
 type ConfirmAction =
   | {
@@ -353,7 +356,15 @@ function isDateInsideRange(
 
 export function PurchasesPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const returnState =
+    location.state as ReturnToPurchaseState | null;
+  const initialReturnState =
+    returnState?.returnToPurchase
+      ? returnState
+      : null;
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -368,9 +379,23 @@ export function PurchasesPage() {
   const [expandedPurchaseId, setExpandedPurchaseId] =
     useState<string | null>(null);
 
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(
+    Boolean(initialReturnState),
+  );
   const [selectedPurchase, setSelectedPurchase] =
     useState<Purchase | null>(null);
+  const [initialDraft, setInitialDraft] =
+    useState<PurchaseFormDraft | null>(
+      initialReturnState?.purchaseDraft || null,
+    );
+  const [createdProductId, setCreatedProductId] =
+    useState<string | null>(
+      initialReturnState?.createdProductId || null,
+    );
+  const [resumePurchaseId, setResumePurchaseId] =
+    useState<string | null>(
+      initialReturnState?.purchaseId || null,
+    );
 
   const [formError, setFormError] = useState<
     string | null
@@ -423,15 +448,25 @@ export function PurchasesPage() {
     queryFn: getCategories,
   });
 
-  const {
-    data: subCategories = [],
-    isLoading: subCategoriesLoading,
-    isError: subCategoriesIsError,
-    error: subCategoriesError,
-  } = useQuery({
-    queryKey: ['sub-categories'],
-    queryFn: () => getSubCategories(),
-  });
+  useEffect(() => {
+    if (!returnState?.returnToPurchase) {
+      return;
+    }
+
+    navigate('/purchases', {
+      replace: true,
+      state: null,
+    });
+  }, [navigate, returnState]);
+
+  const purchaseForForm =
+    selectedPurchase ||
+    (resumePurchaseId
+      ? purchases.find(
+          (purchase) =>
+            purchase.id === resumePurchaseId,
+        ) || null
+      : null);
 
   const filteredPurchases = useMemo(() => {
     const normalizedSearch = search
@@ -571,6 +606,9 @@ export function PurchasesPage() {
 
       setFormOpen(false);
       setSelectedPurchase(null);
+      setInitialDraft(null);
+      setCreatedProductId(null);
+      setResumePurchaseId(null);
       setFormError(null);
       setActionError(null);
     },
@@ -578,21 +616,6 @@ export function PurchasesPage() {
     onError: (mutationError) => {
       setFormError(
         getErrorMessage(mutationError),
-      );
-    },
-  });
-
-  const createProductMutation = useMutation({
-    mutationFn: createProduct,
-    onSuccess: (createdProduct) => {
-      queryClient.setQueryData<Product[]>(
-        ['products'],
-        (current = []) => [
-          ...current.filter(
-            (product) => product.id !== createdProduct.id,
-          ),
-          createdProduct,
-        ],
       );
     },
   });
@@ -611,6 +634,9 @@ export function PurchasesPage() {
 
       setFormOpen(false);
       setSelectedPurchase(null);
+      setInitialDraft(null);
+      setCreatedProductId(null);
+      setResumePurchaseId(null);
       setFormError(null);
       setActionError(null);
     },
@@ -698,6 +724,9 @@ export function PurchasesPage() {
 
   const handleCreatePurchase = () => {
     setSelectedPurchase(null);
+    setInitialDraft(null);
+    setCreatedProductId(null);
+    setResumePurchaseId(null);
     setFormError(null);
     setActionError(null);
     setFormOpen(true);
@@ -714,17 +743,34 @@ export function PurchasesPage() {
     }
 
     setSelectedPurchase(purchase);
+    setInitialDraft(null);
+    setCreatedProductId(null);
+    setResumePurchaseId(null);
     setFormError(null);
     setActionError(null);
     setFormOpen(true);
   };
 
+  const handleCreateNewProduct = (
+    purchaseDraft: PurchaseFormDraft,
+  ) => {
+    const navigationState: CreateProductFromPurchaseState = {
+      fromPurchase: true,
+      purchaseDraft,
+      purchaseId: purchaseForForm?.id || null,
+    };
+
+    navigate('/products', {
+      state: navigationState,
+    });
+  };
+
   const handleSubmitPurchase = (
     data: CreatePurchaseRequest,
   ) => {
-    if (selectedPurchase) {
+    if (purchaseForForm) {
       updateMutation.mutate({
-        id: selectedPurchase.id,
+        id: purchaseForForm.id,
         data,
       });
 
@@ -800,8 +846,7 @@ export function PurchasesPage() {
     purchasesLoading ||
     providersLoading ||
     productsLoading ||
-    categoriesLoading ||
-    subCategoriesLoading
+    categoriesLoading
   ) {
     return (
       <Loading message="Cargando compras..." />
@@ -843,16 +888,6 @@ export function PurchasesPage() {
       <ErrorMessage
         message={getErrorMessage(
           categoriesError,
-        )}
-      />
-    );
-  }
-
-  if (subCategoriesIsError) {
-    return (
-      <ErrorMessage
-        message={getErrorMessage(
-          subCategoriesError,
         )}
       />
     );
@@ -2012,15 +2047,13 @@ export function PurchasesPage() {
 
       <PurchaseFormDialog
         open={formOpen}
-        purchase={selectedPurchase}
+        purchase={purchaseForForm}
         providers={providers}
         categories={categories}
-        subCategories={subCategories}
         products={products}
         canCreateProduct={isAdmin}
-        productCreationLoading={
-          createProductMutation.isPending
-        }
+        initialDraft={initialDraft}
+        createdProductId={createdProductId}
         loading={formLoading}
         error={formError}
         onClose={() => {
@@ -2030,11 +2063,12 @@ export function PurchasesPage() {
 
           setFormOpen(false);
           setSelectedPurchase(null);
+          setInitialDraft(null);
+          setCreatedProductId(null);
+          setResumePurchaseId(null);
           setFormError(null);
         }}
-        onCreateProduct={(data) =>
-          createProductMutation.mutateAsync(data)
-        }
+        onCreateNewProduct={handleCreateNewProduct}
         onSubmit={handleSubmitPurchase}
       />
 
