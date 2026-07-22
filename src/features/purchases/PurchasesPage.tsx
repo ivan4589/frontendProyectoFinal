@@ -50,8 +50,12 @@ import {
 } from '@tanstack/react-query';
 
 import { getProviders } from '../../api/providers.api';
-import { getProducts } from '../../api/products.api';
+import {
+  createProduct,
+  getProducts,
+} from '../../api/products.api';
 import { getCategories } from '../../api/categories.api';
+import { getSubCategories } from '../../api/subCategories.api';
 
 import {
   cancelPurchase,
@@ -77,6 +81,7 @@ import type {
   PurchaseStatus,
   UpdatePurchaseRequest,
 } from '../../types/purchase.types';
+import type { Product } from '../../types/product.types';
 
 import { PurchaseFormDialog } from './PurchaseFormDialog';
 
@@ -418,6 +423,16 @@ export function PurchasesPage() {
     queryFn: getCategories,
   });
 
+  const {
+    data: subCategories = [],
+    isLoading: subCategoriesLoading,
+    isError: subCategoriesIsError,
+    error: subCategoriesError,
+  } = useQuery({
+    queryKey: ['sub-categories'],
+    queryFn: () => getSubCategories(),
+  });
+
   const filteredPurchases = useMemo(() => {
     const normalizedSearch = search
       .trim()
@@ -563,6 +578,21 @@ export function PurchasesPage() {
     onError: (mutationError) => {
       setFormError(
         getErrorMessage(mutationError),
+      );
+    },
+  });
+
+  const createProductMutation = useMutation({
+    mutationFn: createProduct,
+    onSuccess: (createdProduct) => {
+      queryClient.setQueryData<Product[]>(
+        ['products'],
+        (current = []) => [
+          ...current.filter(
+            (product) => product.id !== createdProduct.id,
+          ),
+          createdProduct,
+        ],
       );
     },
   });
@@ -770,7 +800,8 @@ export function PurchasesPage() {
     purchasesLoading ||
     providersLoading ||
     productsLoading ||
-    categoriesLoading
+    categoriesLoading ||
+    subCategoriesLoading
   ) {
     return (
       <Loading message="Cargando compras..." />
@@ -812,6 +843,16 @@ export function PurchasesPage() {
       <ErrorMessage
         message={getErrorMessage(
           categoriesError,
+        )}
+      />
+    );
+  }
+
+  if (subCategoriesIsError) {
+    return (
+      <ErrorMessage
+        message={getErrorMessage(
+          subCategoriesError,
         )}
       />
     );
@@ -1974,7 +2015,12 @@ export function PurchasesPage() {
         purchase={selectedPurchase}
         providers={providers}
         categories={categories}
+        subCategories={subCategories}
         products={products}
+        canCreateProduct={isAdmin}
+        productCreationLoading={
+          createProductMutation.isPending
+        }
         loading={formLoading}
         error={formError}
         onClose={() => {
@@ -1986,6 +2032,9 @@ export function PurchasesPage() {
           setSelectedPurchase(null);
           setFormError(null);
         }}
+        onCreateProduct={(data) =>
+          createProductMutation.mutateAsync(data)
+        }
         onSubmit={handleSubmitPurchase}
       />
 
