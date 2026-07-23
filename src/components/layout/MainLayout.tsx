@@ -20,6 +20,7 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
@@ -55,6 +56,11 @@ const menuItems = [
     text: 'Ventas',
     path: '/sales',
     icon: <ReceiptIcon />,
+  },
+  {
+    text: 'Cobranza',
+    path: '/collections',
+    icon: <AccountBalanceWalletIcon />,
   },
   {
     text: 'Reportes',
