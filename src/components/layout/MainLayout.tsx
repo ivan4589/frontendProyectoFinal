@@ -21,6 +21,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
@@ -53,6 +54,12 @@ const menuItems = [
     icon: <ShoppingCartIcon />,
   },
   {
+    text: 'Transferencias',
+    path: '/warehouse-transfers',
+    icon: <SwapHorizIcon />,
+    adminOnly: true,
+  },
+  {
     text: 'Ventas',
     path: '/sales',
     icon: <ReceiptIcon />,
@@ -79,6 +86,10 @@ export function MainLayout() {
   };
 
   const userLabel = user?.name || user?.email || 'Usuario';
+  const visibleMenuItems = menuItems.filter(
+    (item) =>
+      !item.adminOnly || user?.role === 'ADMIN',
+  );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -158,7 +169,7 @@ export function MainLayout() {
 
         <Box sx={{ overflow: 'auto', mt: 1 }}>
           <List>
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <ListItemButton
                 key={item.path}
                 component={NavLink}
