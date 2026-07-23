@@ -651,7 +651,7 @@ export function SaleFormDialog({
     setProductId(product?.id || '');
     setManualDraftPrice(false);
 
-    if (!product || !selectedClient) {
+    if (!product) {
       setUnitPrice(0);
       return;
     }
@@ -662,7 +662,7 @@ export function SaleFormDialog({
     setUnitPrice(
       getAutomaticPrice(
         product,
-        selectedClient.type,
+        clientType,
         Number.isInteger(parsedQuantity) &&
           parsedQuantity > 0
           ? parsedQuantity
@@ -681,8 +681,7 @@ export function SaleFormDialog({
 
     if (
       manualDraftPrice ||
-      !selectedProduct ||
-      !selectedClient
+      !selectedProduct
     ) {
       return;
     }
@@ -701,7 +700,7 @@ export function SaleFormDialog({
     setUnitPrice(
       getAutomaticPrice(
         selectedProduct,
-        selectedClient.type,
+        clientType,
         parsedQuantity,
       ),
     );
@@ -715,13 +714,6 @@ export function SaleFormDialog({
 
     const parsedUnitPrice =
       Number(unitPrice);
-
-    if (!clientId) {
-      setLocalError(
-        'Debes seleccionar un cliente',
-      );
-      return;
-    }
 
     if (!productId) {
       setLocalError(
@@ -1258,13 +1250,15 @@ export function SaleFormDialog({
                   event.target.value,
                 )
               }
-              inputProps={{
-                min: getToday(),
-                max:
-                  getMaximumCreditDate(),
-              }}
-              InputLabelProps={{
-                shrink: true,
+              slotProps={{
+                inputLabel: {
+                  shrink: true,
+                },
+                htmlInput: {
+                  min: getToday(),
+                  max:
+                    getMaximumCreditDate(),
+                },
               }}
               disabled={loading}
             />
@@ -1402,9 +1396,7 @@ export function SaleFormDialog({
                 value,
               ) => option.id === value.id}
               noOptionsText="No se encontraron productos"
-              disabled={
-                loading || !clientId
-              }
+              disabled={loading}
               renderInput={(params) => (
                 <TextField
                   {...params}
