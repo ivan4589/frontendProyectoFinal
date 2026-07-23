@@ -48,14 +48,12 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import {
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { getProviders } from '../../api/providers.api';
 import { getProducts } from '../../api/products.api';
 import { getCategories } from '../../api/categories.api';
+import { getWarehouses } from '../../api/warehouses.api';
 
 import {
   cancelPurchase,
@@ -226,8 +224,7 @@ function getPdfUrl(pdfUrl?: string | null) {
   }
 
   const apiUrl =
-    import.meta.env.VITE_API_URL ||
-    'http://localhost:3000';
+    import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
   return `${apiUrl}${pdfUrl}`;
 }
@@ -244,9 +241,7 @@ function canEditPurchase(purchase: Purchase) {
   return (
     purchase.status === 'PENDING' &&
     groups.length > 0 &&
-    groups.every(
-      (group) => group.status === 'PENDING',
-    )
+    groups.every((group) => group.status === 'PENDING')
   );
 }
 
@@ -275,8 +270,7 @@ function getPurchaseProgress(purchase: Purchase) {
     received,
     cancelled,
     processed,
-    percentage:
-      total > 0 ? (processed / total) * 100 : 0,
+    percentage: total > 0 ? (processed / total) * 100 : 0,
   };
 }
 
@@ -299,9 +293,7 @@ function groupDetailsByCategory(
 
     if (existing) {
       existing.details.push(detail);
-      existing.subtotal += Number(
-        detail.subtotal || 0,
-      );
+      existing.subtotal += Number(detail.subtotal || 0);
     } else {
       categoryMap.set(categoryId, {
         categoryId,
@@ -314,9 +306,7 @@ function groupDetailsByCategory(
 
   return Array.from(categoryMap.values()).sort(
     (first, second) =>
-      first.categoryName.localeCompare(
-        second.categoryName,
-      ),
+      first.categoryName.localeCompare(second.categoryName),
   );
 }
 
@@ -332,9 +322,7 @@ function isDateInsideRange(
   }
 
   if (dateFrom) {
-    const minimumDate = new Date(
-      `${dateFrom}T00:00:00`,
-    );
+    const minimumDate = new Date(`${dateFrom}T00:00:00`);
 
     if (currentDate < minimumDate) {
       return false;
@@ -342,9 +330,7 @@ function isDateInsideRange(
   }
 
   if (dateTo) {
-    const maximumDate = new Date(
-      `${dateTo}T23:59:59.999`,
-    );
+    const maximumDate = new Date(`${dateTo}T23:59:59.999`);
 
     if (currentDate > maximumDate) {
       return false;
@@ -361,16 +347,16 @@ export function PurchasesPage() {
   const { user } = useAuth();
   const returnState =
     location.state as ReturnToPurchaseState | null;
-  const initialReturnState =
-    returnState?.returnToPurchase
-      ? returnState
-      : null;
+  const initialReturnState = returnState?.returnToPurchase
+    ? returnState
+    : null;
 
   const isAdmin = user?.role === 'ADMIN';
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] =
-    useState<PurchaseStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<
+    PurchaseStatus | 'ALL'
+  >('ALL');
   const [providerFilter, setProviderFilter] =
     useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
@@ -388,18 +374,16 @@ export function PurchasesPage() {
     useState<PurchaseFormDraft | null>(
       initialReturnState?.purchaseDraft || null,
     );
-  const [createdProductId, setCreatedProductId] =
-    useState<string | null>(
-      initialReturnState?.createdProductId || null,
-    );
-  const [resumePurchaseId, setResumePurchaseId] =
-    useState<string | null>(
-      initialReturnState?.purchaseId || null,
-    );
-
-  const [formError, setFormError] = useState<
+  const [createdProductId, setCreatedProductId] = useState<
     string | null
-  >(null);
+  >(initialReturnState?.createdProductId || null);
+  const [resumePurchaseId, setResumePurchaseId] = useState<
+    string | null
+  >(initialReturnState?.purchaseId || null);
+
+  const [formError, setFormError] = useState<string | null>(
+    null,
+  );
 
   const [actionError, setActionError] = useState<
     string | null
@@ -448,6 +432,16 @@ export function PurchasesPage() {
     queryFn: getCategories,
   });
 
+  const {
+    data: warehouses = [],
+    isLoading: warehousesLoading,
+    isError: warehousesIsError,
+    error: warehousesError,
+  } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: getWarehouses,
+  });
+
   useEffect(() => {
     if (!returnState?.returnToPurchase) {
       return;
@@ -463,15 +457,12 @@ export function PurchasesPage() {
     selectedPurchase ||
     (resumePurchaseId
       ? purchases.find(
-          (purchase) =>
-            purchase.id === resumePurchaseId,
+          (purchase) => purchase.id === resumePurchaseId,
         ) || null
       : null);
 
   const filteredPurchases = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLowerCase();
+    const normalizedSearch = search.trim().toLowerCase();
 
     return purchases.filter((purchase) => {
       const groups = getPurchaseGroups(purchase);
@@ -495,11 +486,8 @@ export function PurchasesPage() {
         !normalizedSearch ||
         searchableValues
           .filter(
-            (
-              value,
-            ): value is string | number =>
-              value !== null &&
-              value !== undefined,
+            (value): value is string | number =>
+              value !== null && value !== undefined,
           )
           .some((value) =>
             String(value)
@@ -514,8 +502,7 @@ export function PurchasesPage() {
       const matchesProvider =
         providerFilter === 'ALL' ||
         groups.some(
-          (group) =>
-            group.providerId === providerFilter,
+          (group) => group.providerId === providerFilter,
         );
 
       const matchesDate = isDateInsideRange(
@@ -546,9 +533,7 @@ export function PurchasesPage() {
     let receivedValue = 0;
 
     for (const purchase of purchases) {
-      for (const group of getPurchaseGroups(
-        purchase,
-      )) {
+      for (const group of getPurchaseGroups(purchase)) {
         if (group.status === 'PENDING') {
           pendingGroups += 1;
         }
@@ -564,18 +549,15 @@ export function PurchasesPage() {
       totalPurchases: purchases.length,
 
       pendingPurchases: purchases.filter(
-        (purchase) =>
-          purchase.status === 'PENDING',
+        (purchase) => purchase.status === 'PENDING',
       ).length,
 
       receivedPurchases: purchases.filter(
-        (purchase) =>
-          purchase.status === 'RECEIVED',
+        (purchase) => purchase.status === 'RECEIVED',
       ).length,
 
       cancelledPurchases: purchases.filter(
-        (purchase) =>
-          purchase.status === 'CANCELLED',
+        (purchase) => purchase.status === 'CANCELLED',
       ).length,
 
       pendingGroups,
@@ -594,6 +576,9 @@ export function PurchasesPage() {
       }),
       queryClient.invalidateQueries({
         queryKey: ['dashboard'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['warehouses'],
       }),
     ]);
   };
@@ -614,9 +599,7 @@ export function PurchasesPage() {
     },
 
     onError: (mutationError) => {
-      setFormError(
-        getErrorMessage(mutationError),
-      );
+      setFormError(getErrorMessage(mutationError));
     },
   });
 
@@ -642,9 +625,7 @@ export function PurchasesPage() {
     },
 
     onError: (mutationError) => {
-      setFormError(
-        getErrorMessage(mutationError),
-      );
+      setFormError(getErrorMessage(mutationError));
     },
   });
 
@@ -656,10 +637,7 @@ export function PurchasesPage() {
       purchaseId: string;
       providerGroupId: string;
     }) =>
-      receivePurchaseProvider(
-        purchaseId,
-        providerGroupId,
-      ),
+      receivePurchaseProvider(purchaseId, providerGroupId),
 
     onSuccess: async () => {
       await refreshPurchasesAndProducts();
@@ -669,9 +647,7 @@ export function PurchasesPage() {
     },
 
     onError: (mutationError) => {
-      setActionError(
-        getErrorMessage(mutationError),
-      );
+      setActionError(getErrorMessage(mutationError));
       setConfirmAction(null);
     },
   });
@@ -684,10 +660,7 @@ export function PurchasesPage() {
       purchaseId: string;
       providerGroupId: string;
     }) =>
-      cancelPurchaseProvider(
-        purchaseId,
-        providerGroupId,
-      ),
+      cancelPurchaseProvider(purchaseId, providerGroupId),
 
     onSuccess: async () => {
       await refreshPurchasesAndProducts();
@@ -697,9 +670,7 @@ export function PurchasesPage() {
     },
 
     onError: (mutationError) => {
-      setActionError(
-        getErrorMessage(mutationError),
-      );
+      setActionError(getErrorMessage(mutationError));
       setConfirmAction(null);
     },
   });
@@ -715,9 +686,7 @@ export function PurchasesPage() {
     },
 
     onError: (mutationError) => {
-      setActionError(
-        getErrorMessage(mutationError),
-      );
+      setActionError(getErrorMessage(mutationError));
       setConfirmAction(null);
     },
   });
@@ -732,9 +701,7 @@ export function PurchasesPage() {
     setFormOpen(true);
   };
 
-  const handleEditPurchase = (
-    purchase: Purchase,
-  ) => {
+  const handleEditPurchase = (purchase: Purchase) => {
     if (!canEditPurchase(purchase)) {
       setActionError(
         'La compra ya tiene proveedores recibidos o anulados y no puede editarse.',
@@ -754,11 +721,12 @@ export function PurchasesPage() {
   const handleCreateNewProduct = (
     purchaseDraft: PurchaseFormDraft,
   ) => {
-    const navigationState: CreateProductFromPurchaseState = {
-      fromPurchase: true,
-      purchaseDraft,
-      purchaseId: purchaseForForm?.id || null,
-    };
+    const navigationState: CreateProductFromPurchaseState =
+      {
+        fromPurchase: true,
+        purchaseDraft,
+        purchaseId: purchaseForForm?.id || null,
+      };
 
     navigate('/products', {
       state: navigationState,
@@ -785,29 +753,19 @@ export function PurchasesPage() {
       return;
     }
 
-    if (
-      confirmAction.kind ===
-      'RECEIVE_PROVIDER'
-    ) {
+    if (confirmAction.kind === 'RECEIVE_PROVIDER') {
       receiveProviderMutation.mutate({
-        purchaseId:
-          confirmAction.purchase.id,
-        providerGroupId:
-          confirmAction.providerGroup.id,
+        purchaseId: confirmAction.purchase.id,
+        providerGroupId: confirmAction.providerGroup.id,
       });
 
       return;
     }
 
-    if (
-      confirmAction.kind ===
-      'CANCEL_PROVIDER'
-    ) {
+    if (confirmAction.kind === 'CANCEL_PROVIDER') {
       cancelProviderMutation.mutate({
-        purchaseId:
-          confirmAction.purchase.id,
-        providerGroupId:
-          confirmAction.providerGroup.id,
+        purchaseId: confirmAction.purchase.id,
+        providerGroupId: confirmAction.providerGroup.id,
       });
 
       return;
@@ -839,26 +797,22 @@ export function PurchasesPage() {
     cancelPurchaseMutation.isPending;
 
   const formLoading =
-    createMutation.isPending ||
-    updateMutation.isPending;
+    createMutation.isPending || updateMutation.isPending;
 
   if (
     purchasesLoading ||
     providersLoading ||
     productsLoading ||
-    categoriesLoading
+    categoriesLoading ||
+    warehousesLoading
   ) {
-    return (
-      <Loading message="Cargando compras..." />
-    );
+    return <Loading message="Cargando compras..." />;
   }
 
   if (purchasesIsError) {
     return (
       <ErrorMessage
-        message={getErrorMessage(
-          purchasesError,
-        )}
+        message={getErrorMessage(purchasesError)}
       />
     );
   }
@@ -866,9 +820,7 @@ export function PurchasesPage() {
   if (providersIsError) {
     return (
       <ErrorMessage
-        message={getErrorMessage(
-          providersError,
-        )}
+        message={getErrorMessage(providersError)}
       />
     );
   }
@@ -876,9 +828,7 @@ export function PurchasesPage() {
   if (productsIsError) {
     return (
       <ErrorMessage
-        message={getErrorMessage(
-          productsError,
-        )}
+        message={getErrorMessage(productsError)}
       />
     );
   }
@@ -886,9 +836,15 @@ export function PurchasesPage() {
   if (categoriesIsError) {
     return (
       <ErrorMessage
-        message={getErrorMessage(
-          categoriesError,
-        )}
+        message={getErrorMessage(categoriesError)}
+      />
+    );
+  }
+
+  if (warehousesIsError) {
+    return (
+      <ErrorMessage
+        message={getErrorMessage(warehousesError)}
       />
     );
   }
@@ -896,17 +852,14 @@ export function PurchasesPage() {
   return (
     <>
       <Box sx={{ mb: 3 }}>
-        <Typography
-          variant="h4"
-          fontWeight={800}
-        >
+        <Typography variant="h4" fontWeight={800}>
           Gestión de Compras
         </Typography>
 
         <Typography color="text.secondary">
-          Registro de compras con varios
-          proveedores, recepción de mercadería
-          y actualización de precios y stock.
+          Registro de compras con varios proveedores,
+          recepción de mercadería y actualización de precios
+          y stock.
         </Typography>
       </Box>
 
@@ -937,10 +890,7 @@ export function PurchasesPage() {
                 TOTAL COMPRAS
               </Typography>
 
-              <Typography
-                variant="h4"
-                fontWeight={800}
-              >
+              <Typography variant="h4" fontWeight={800}>
                 {summary.totalPurchases}
               </Typography>
 
@@ -978,10 +928,7 @@ export function PurchasesPage() {
                 COMPRAS PENDIENTES
               </Typography>
 
-              <Typography
-                variant="h4"
-                fontWeight={800}
-              >
+              <Typography variant="h4" fontWeight={800}>
                 {summary.pendingPurchases}
               </Typography>
 
@@ -1019,10 +966,7 @@ export function PurchasesPage() {
                 PROVEEDORES PENDIENTES
               </Typography>
 
-              <Typography
-                variant="h4"
-                fontWeight={800}
-              >
+              <Typography variant="h4" fontWeight={800}>
                 {summary.pendingGroups}
               </Typography>
 
@@ -1060,10 +1004,7 @@ export function PurchasesPage() {
                 COMPRAS RECIBIDAS
               </Typography>
 
-              <Typography
-                variant="h4"
-                fontWeight={800}
-              >
+              <Typography variant="h4" fontWeight={800}>
                 {summary.receivedPurchases}
               </Typography>
 
@@ -1095,13 +1036,8 @@ export function PurchasesPage() {
             VALOR RECIBIDO
           </Typography>
 
-          <Typography
-            variant="h5"
-            fontWeight={800}
-          >
-            {formatCurrency(
-              summary.receivedValue,
-            )}
+          <Typography variant="h5" fontWeight={800}>
+            {formatCurrency(summary.receivedValue)}
           </Typography>
 
           <Typography
@@ -1115,10 +1051,9 @@ export function PurchasesPage() {
 
       {!isAdmin && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Tu rol permite consultar las compras.
-          La creación, edición, recepción y
-          anulación están reservadas para el
-          administrador.
+          Tu rol permite consultar las compras. La creación,
+          edición, recepción y anulación están reservadas
+          para el administrador.
         </Alert>
       )}
 
@@ -1147,10 +1082,7 @@ export function PurchasesPage() {
           sx={{ mb: 2 }}
         >
           <Box>
-            <Typography
-              variant="h6"
-              fontWeight={800}
-            >
+            <Typography variant="h6" fontWeight={800}>
               Listado de Compras
             </Typography>
 
@@ -1158,8 +1090,7 @@ export function PurchasesPage() {
               variant="body2"
               color="text.secondary"
             >
-              Mostrando{' '}
-              {filteredPurchases.length} de{' '}
+              Mostrando {filteredPurchases.length} de{' '}
               {purchases.length} compras
             </Typography>
           </Box>
@@ -1198,15 +1129,12 @@ export function PurchasesPage() {
               onChange={(event) =>
                 setStatusFilter(
                   event.target.value as
-                    | PurchaseStatus
-                    | 'ALL',
+                    PurchaseStatus | 'ALL',
                 )
               }
               sx={{ minWidth: 145 }}
             >
-              <MenuItem value="ALL">
-                Todos
-              </MenuItem>
+              <MenuItem value="ALL">Todos</MenuItem>
 
               <MenuItem value="PENDING">
                 Pendientes
@@ -1227,15 +1155,11 @@ export function PurchasesPage() {
               label="Proveedor"
               value={providerFilter}
               onChange={(event) =>
-                setProviderFilter(
-                  event.target.value,
-                )
+                setProviderFilter(event.target.value)
               }
               sx={{ minWidth: 180 }}
             >
-              <MenuItem value="ALL">
-                Todos
-              </MenuItem>
+              <MenuItem value="ALL">Todos</MenuItem>
 
               {providers.map((provider) => (
                 <MenuItem
@@ -1335,29 +1259,17 @@ export function PurchasesPage() {
               >
                 <TableCell width={50} />
 
-                <TableCell>
-                  Compra
-                </TableCell>
+                <TableCell>Compra</TableCell>
 
-                <TableCell>
-                  Proveedores
-                </TableCell>
+                <TableCell>Proveedores</TableCell>
 
-                <TableCell>
-                  Estado
-                </TableCell>
+                <TableCell>Estado</TableCell>
 
-                <TableCell>
-                  Progreso
-                </TableCell>
+                <TableCell>Progreso</TableCell>
 
-                <TableCell>
-                  Total
-                </TableCell>
+                <TableCell>Total</TableCell>
 
-                <TableCell>
-                  Fecha
-                </TableCell>
+                <TableCell>Fecha</TableCell>
 
                 <TableCell align="right">
                   Acciones
@@ -1366,680 +1278,656 @@ export function PurchasesPage() {
             </TableHead>
 
             <TableBody>
-              {filteredPurchases.length ===
-                0 && (
+              {filteredPurchases.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Alert severity="info">
-                      No se encontraron compras
-                      con los filtros seleccionados.
+                      No se encontraron compras con los
+                      filtros seleccionados.
                     </Alert>
                   </TableCell>
                 </TableRow>
               )}
 
-              {filteredPurchases.map(
-                (purchase) => {
-                  const groups =
-                    getPurchaseGroups(purchase);
+              {filteredPurchases.map((purchase) => {
+                const groups = getPurchaseGroups(purchase);
 
-                  const statusStyle =
-                    getStatusStyle(
-                      purchase.status,
-                    );
+                const statusStyle = getStatusStyle(
+                  purchase.status,
+                );
 
-                  const progress =
-                    getPurchaseProgress(
-                      purchase,
-                    );
+                const progress =
+                  getPurchaseProgress(purchase);
 
-                  const expanded =
-                    expandedPurchaseId ===
-                    purchase.id;
+                const expanded =
+                  expandedPurchaseId === purchase.id;
 
-                  return (
-                    <>
-                      <TableRow
-                        key={purchase.id}
-                        hover
-                        sx={{
-                          '& td': {
-                            borderColor: '#edf0f2',
-                          },
-                        }}
-                      >
-                        <TableCell>
-                          <Tooltip
-                            title={
-                              expanded
-                                ? 'Ocultar detalle'
-                                : 'Ver detalle'
+                return (
+                  <>
+                    <TableRow
+                      key={purchase.id}
+                      hover
+                      sx={{
+                        '& td': {
+                          borderColor: '#edf0f2',
+                        },
+                      }}
+                    >
+                      <TableCell>
+                        <Tooltip
+                          title={
+                            expanded
+                              ? 'Ocultar detalle'
+                              : 'Ver detalle'
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setExpandedPurchaseId(
+                                expanded
+                                  ? null
+                                  : purchase.id,
+                              )
                             }
                           >
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                setExpandedPurchaseId(
-                                  expanded
-                                    ? null
-                                    : purchase.id,
-                                )
-                              }
-                            >
-                              {expanded ? (
-                                <ExpandLessIcon />
-                              ) : (
-                                <ExpandMoreIcon />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-
-                        <TableCell>
-                          <Stack
-                            direction="row"
-                            spacing={1.5}
-                            alignItems="center"
-                          >
-                            <Avatar
-                              variant="rounded"
-                              sx={{
-                                width: 38,
-                                height: 38,
-                                bgcolor:
-                                  statusStyle.backgroundColor,
-                                color:
-                                  statusStyle.color,
-                              }}
-                            >
-                              <ReceiptLongIcon fontSize="small" />
-                            </Avatar>
-
-                            <Box>
-                              <Typography
-                                fontWeight={800}
-                              >
-                                Compra #
-                                {purchase.id.slice(
-                                  0,
-                                  8,
-                                )}
-                              </Typography>
-
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Registró:{' '}
-                                {purchase.userName ||
-                                  `Usuario ${purchase.userId}`}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </TableCell>
-
-                        <TableCell>
-                          <Stack
-                            direction="row"
-                            spacing={0.5}
-                            flexWrap="wrap"
-                            useFlexGap
-                          >
-                            {groups
-                              .slice(0, 2)
-                              .map((group) => (
-                                <Chip
-                                  key={group.id}
-                                  size="small"
-                                  label={
-                                    group.providerName
-                                  }
-                                  variant="outlined"
-                                />
-                              ))}
-
-                            {groups.length > 2 && (
-                              <Chip
-                                size="small"
-                                label={`+${
-                                  groups.length - 2
-                                }`}
-                              />
+                            {expanded ? (
+                              <ExpandLessIcon />
+                            ) : (
+                              <ExpandMoreIcon />
                             )}
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
 
-                            {groups.length ===
-                              0 && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                Sin proveedores
-                              </Typography>
-                            )}
-                          </Stack>
-                        </TableCell>
-
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            label={getStatusLabel(
-                              purchase.status,
-                            )}
+                      <TableCell>
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          alignItems="center"
+                        >
+                          <Avatar
+                            variant="rounded"
                             sx={{
+                              width: 38,
+                              height: 38,
                               bgcolor:
                                 statusStyle.backgroundColor,
-                              color:
-                                statusStyle.color,
-                              fontWeight: 800,
+                              color: statusStyle.color,
                             }}
-                          />
-                        </TableCell>
+                          >
+                            <ReceiptLongIcon fontSize="small" />
+                          </Avatar>
 
-                        <TableCell
-                          sx={{ minWidth: 170 }}
+                          <Box>
+                            <Typography fontWeight={800}>
+                              Compra #
+                              {purchase.id.slice(0, 8)}
+                            </Typography>
+
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Registró:{' '}
+                              {purchase.userName ||
+                                `Usuario ${purchase.userId}`}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+
+                      <TableCell>
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          flexWrap="wrap"
+                          useFlexGap
                         >
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {
-                              progress.processed
-                            }{' '}
-                            de {progress.total}{' '}
-                            proveedores procesados
-                          </Typography>
+                          {groups
+                            .slice(0, 2)
+                            .map((group) => (
+                              <Chip
+                                key={group.id}
+                                size="small"
+                                label={group.providerName}
+                                variant="outlined"
+                              />
+                            ))}
 
-                          <LinearProgress
-                            variant="determinate"
-                            value={
-                              progress.percentage
-                            }
-                            sx={{
-                              mt: 0.75,
-                              height: 7,
-                              borderRadius: 4,
-                            }}
-                          />
+                          {groups.length > 2 && (
+                            <Chip
+                              size="small"
+                              label={`+${groups.length - 2}`}
+                            />
+                          )}
 
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            Pendientes:{' '}
-                            {progress.pending} ·
-                            Recibidos:{' '}
-                            {progress.received} ·
-                            Anulados:{' '}
-                            {progress.cancelled}
-                          </Typography>
-                        </TableCell>
+                          {groups.length === 0 && (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              Sin proveedores
+                            </Typography>
+                          )}
+                        </Stack>
+                      </TableCell>
 
-                        <TableCell>
-                          <Typography
-                            fontWeight={900}
-                          >
-                            {formatCurrency(
-                              purchase.total,
-                            )}
-                          </Typography>
-                        </TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={getStatusLabel(
+                            purchase.status,
+                          )}
+                          sx={{
+                            bgcolor:
+                              statusStyle.backgroundColor,
+                            color: statusStyle.color,
+                            fontWeight: 800,
+                          }}
+                        />
+                      </TableCell>
 
-                        <TableCell>
-                          <Typography variant="body2">
-                            {formatDate(
-                              purchase.date,
-                            )}
-                          </Typography>
-                        </TableCell>
+                      <TableCell sx={{ minWidth: 170 }}>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          {progress.processed} de{' '}
+                          {progress.total} proveedores
+                          procesados
+                        </Typography>
 
-                        <TableCell align="right">
-                          {purchase.pdfUrl && (
-                            <Tooltip title="Abrir comprobante PDF">
+                        <LinearProgress
+                          variant="determinate"
+                          value={progress.percentage}
+                          sx={{
+                            mt: 0.75,
+                            height: 7,
+                            borderRadius: 4,
+                          }}
+                        />
+
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          Pendientes: {progress.pending} ·
+                          Recibidos: {progress.received} ·
+                          Anulados: {progress.cancelled}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography fontWeight={900}>
+                          {formatCurrency(purchase.total)}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="body2">
+                          {formatDate(purchase.date)}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell align="right">
+                        {purchase.pdfUrl && (
+                          <Tooltip title="Abrir comprobante PDF">
+                            <IconButton
+                              size="small"
+                              component="a"
+                              href={getPdfUrl(
+                                purchase.pdfUrl,
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <FileDownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+
+                        {isAdmin &&
+                          canEditPurchase(purchase) && (
+                            <Tooltip title="Editar compra">
                               <IconButton
                                 size="small"
-                                component="a"
-                                href={getPdfUrl(
-                                  purchase.pdfUrl,
-                                )}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                onClick={() =>
+                                  handleEditPurchase(
+                                    purchase,
+                                  )
+                                }
                               >
-                                <FileDownloadIcon fontSize="small" />
+                                <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           )}
 
-                          {isAdmin &&
-                            canEditPurchase(
-                              purchase,
-                            ) && (
-                              <Tooltip title="Editar compra">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    handleEditPurchase(
-                                      purchase,
-                                    )
-                                  }
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
+                        {isAdmin &&
+                          purchase.status !==
+                            'CANCELLED' && (
+                            <Tooltip title="Anular compra completa">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                disabled={actionLoading}
+                                onClick={() =>
+                                  setConfirmAction({
+                                    kind: 'CANCEL_PURCHASE',
+                                    purchase,
+                                  })
+                                }
+                              >
+                                <CancelIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                      </TableCell>
+                    </TableRow>
 
-                          {isAdmin &&
-                            purchase.status !==
-                              'CANCELLED' && (
-                              <Tooltip title="Anular compra completa">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  disabled={
-                                    actionLoading
-                                  }
-                                  onClick={() =>
-                                    setConfirmAction(
-                                      {
-                                        kind: 'CANCEL_PURCHASE',
-                                        purchase,
-                                      },
-                                    )
-                                  }
-                                >
-                                  <CancelIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                        </TableCell>
-                      </TableRow>
-
-                      <TableRow
-                        key={`${purchase.id}-detail`}
+                    <TableRow key={`${purchase.id}-detail`}>
+                      <TableCell
+                        colSpan={8}
+                        sx={{
+                          py: 0,
+                          borderBottom: expanded
+                            ? undefined
+                            : 'none',
+                        }}
                       >
-                        <TableCell
-                          colSpan={8}
-                          sx={{
-                            py: 0,
-                            borderBottom:
-                              expanded
-                                ? undefined
-                                : 'none',
-                          }}
+                        <Collapse
+                          in={expanded}
+                          timeout="auto"
+                          unmountOnExit
                         >
-                          <Collapse
-                            in={expanded}
-                            timeout="auto"
-                            unmountOnExit
+                          <Box
+                            sx={{
+                              py: 2,
+                              px: {
+                                xs: 0,
+                                md: 2,
+                              },
+                            }}
                           >
-                            <Box
-                              sx={{
-                                py: 2,
-                                px: {
-                                  xs: 0,
-                                  md: 2,
-                                },
-                              }}
-                            >
-                              {purchase.observations && (
-                                <Alert
-                                  severity="info"
-                                  sx={{ mb: 2 }}
-                                >
-                                  <strong>
-                                    Observación:
-                                  </strong>{' '}
-                                  {
-                                    purchase.observations
-                                  }
-                                </Alert>
-                              )}
+                            {purchase.observations && (
+                              <Alert
+                                severity="info"
+                                sx={{ mb: 2 }}
+                              >
+                                <strong>
+                                  Observación:
+                                </strong>{' '}
+                                {purchase.observations}
+                              </Alert>
+                            )}
 
-                              <Stack spacing={2}>
-                                {groups.map(
-                                  (
-                                    providerGroup,
-                                  ) => {
-                                    const providerStatusStyle =
-                                      getStatusStyle(
-                                        providerGroup.status,
-                                      );
+                            <Stack spacing={2}>
+                              {groups.map(
+                                (providerGroup) => {
+                                  const providerStatusStyle =
+                                    getStatusStyle(
+                                      providerGroup.status,
+                                    );
 
-                                    const categoryGroups =
-                                      groupDetailsByCategory(
-                                        providerGroup,
-                                      );
+                                  const categoryGroups =
+                                    groupDetailsByCategory(
+                                      providerGroup,
+                                    );
 
-                                    return (
-                                      <Paper
-                                        key={
-                                          providerGroup.id
-                                        }
-                                        variant="outlined"
+                                  return (
+                                    <Paper
+                                      key={providerGroup.id}
+                                      variant="outlined"
+                                      sx={{
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      <Stack
+                                        direction={{
+                                          xs: 'column',
+                                          md: 'row',
+                                        }}
+                                        justifyContent="space-between"
+                                        alignItems={{
+                                          xs: 'stretch',
+                                          md: 'center',
+                                        }}
+                                        spacing={1.5}
                                         sx={{
-                                          overflow:
-                                            'hidden',
+                                          px: 2,
+                                          py: 1.5,
+                                          bgcolor:
+                                            '#f7f9fb',
                                         }}
                                       >
                                         <Stack
-                                          direction={{
-                                            xs: 'column',
-                                            md: 'row',
-                                          }}
-                                          justifyContent="space-between"
-                                          alignItems={{
-                                            xs: 'stretch',
-                                            md: 'center',
-                                          }}
+                                          direction="row"
                                           spacing={1.5}
-                                          sx={{
-                                            px: 2,
-                                            py: 1.5,
-                                            bgcolor:
-                                              '#f7f9fb',
-                                          }}
+                                          alignItems="center"
                                         >
-                                          <Stack
-                                            direction="row"
-                                            spacing={1.5}
-                                            alignItems="center"
+                                          <Avatar
+                                            variant="rounded"
+                                            sx={{
+                                              bgcolor:
+                                                providerStatusStyle.backgroundColor,
+                                              color:
+                                                providerStatusStyle.color,
+                                            }}
                                           >
-                                            <Avatar
-                                              variant="rounded"
-                                              sx={{
-                                                bgcolor:
-                                                  providerStatusStyle.backgroundColor,
-                                                color:
-                                                  providerStatusStyle.color,
-                                              }}
+                                            <LocalShippingIcon />
+                                          </Avatar>
+
+                                          <Box>
+                                            <Typography
+                                              fontWeight={
+                                                900
+                                              }
                                             >
-                                              <LocalShippingIcon />
-                                            </Avatar>
+                                              {
+                                                providerGroup.providerName
+                                              }
+                                            </Typography>
 
-                                            <Box>
-                                              <Typography
-                                                fontWeight={
-                                                  900
-                                                }
-                                              >
-                                                {
-                                                  providerGroup.providerName
-                                                }
-                                              </Typography>
-
-                                              <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                              >
-                                                Total:{' '}
-                                                {formatCurrency(
-                                                  providerGroup.total,
-                                                )}
-                                              </Typography>
-                                            </Box>
-
-                                            <Chip
-                                              size="small"
-                                              label={getStatusLabel(
-                                                providerGroup.status,
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                            >
+                                              Total:{' '}
+                                              {formatCurrency(
+                                                providerGroup.total,
                                               )}
-                                              sx={{
-                                                bgcolor:
-                                                  providerStatusStyle.backgroundColor,
-                                                color:
-                                                  providerStatusStyle.color,
-                                                fontWeight:
-                                                  800,
-                                              }}
-                                            />
-                                          </Stack>
+                                            </Typography>
+                                          </Box>
 
-                                          <Stack
-                                            direction="row"
-                                            spacing={1}
-                                            alignItems="center"
-                                          >
-                                            {providerGroup.receivedAt && (
-                                              <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                              >
-                                                Recibido:{' '}
-                                                {formatDate(
-                                                  providerGroup.receivedAt,
-                                                )}
-                                              </Typography>
+                                          <Chip
+                                            size="small"
+                                            label={getStatusLabel(
+                                              providerGroup.status,
                                             )}
-
-                                            {providerGroup.cancelledAt && (
-                                              <Typography
-                                                variant="caption"
-                                                color="text.secondary"
-                                              >
-                                                Anulado:{' '}
-                                                {formatDate(
-                                                  providerGroup.cancelledAt,
-                                                )}
-                                              </Typography>
-                                            )}
-
-                                            {isAdmin &&
-                                              providerGroup.status ===
-                                                'PENDING' && (
-                                                <Button
-                                                  size="small"
-                                                  variant="contained"
-                                                  color="success"
-                                                  startIcon={
-                                                    <CheckCircleIcon />
-                                                  }
-                                                  disabled={
-                                                    actionLoading
-                                                  }
-                                                  onClick={() =>
-                                                    setConfirmAction(
-                                                      {
-                                                        kind: 'RECEIVE_PROVIDER',
-                                                        purchase,
-                                                        providerGroup,
-                                                      },
-                                                    )
-                                                  }
-                                                  sx={{
-                                                    textTransform:
-                                                      'none',
-                                                    fontWeight:
-                                                      800,
-                                                  }}
-                                                >
-                                                  Recibir
-                                                </Button>
-                                              )}
-
-                                            {isAdmin &&
-                                              providerGroup.status !==
-                                                'CANCELLED' && (
-                                                <Button
-                                                  size="small"
-                                                  variant="outlined"
-                                                  color="error"
-                                                  startIcon={
-                                                    <CancelIcon />
-                                                  }
-                                                  disabled={
-                                                    actionLoading
-                                                  }
-                                                  onClick={() =>
-                                                    setConfirmAction(
-                                                      {
-                                                        kind: 'CANCEL_PROVIDER',
-                                                        purchase,
-                                                        providerGroup,
-                                                      },
-                                                    )
-                                                  }
-                                                  sx={{
-                                                    textTransform:
-                                                      'none',
-                                                    fontWeight:
-                                                      800,
-                                                  }}
-                                                >
-                                                  Anular
-                                                </Button>
-                                              )}
-                                          </Stack>
+                                            sx={{
+                                              bgcolor:
+                                                providerStatusStyle.backgroundColor,
+                                              color:
+                                                providerStatusStyle.color,
+                                              fontWeight: 800,
+                                            }}
+                                          />
                                         </Stack>
 
-                                        <Box
-                                          sx={{
-                                            p: 2,
-                                          }}
+                                        <Stack
+                                          direction="row"
+                                          spacing={1}
+                                          alignItems="center"
                                         >
-                                          <Stack spacing={2}>
-                                            {categoryGroups.map(
-                                              (
-                                                categoryGroup,
-                                              ) => (
-                                                <Box
-                                                  key={
-                                                    categoryGroup.categoryId
-                                                  }
-                                                >
-                                                  <Stack
-                                                    direction="row"
-                                                    justifyContent="space-between"
-                                                    alignItems="center"
-                                                    sx={{
-                                                      mb: 1,
-                                                    }}
-                                                  >
-                                                    <Typography
-                                                      fontWeight={
-                                                        800
-                                                      }
-                                                    >
-                                                      Categoría:{' '}
-                                                      {
-                                                        categoryGroup.categoryName
-                                                      }
-                                                    </Typography>
+                                          {providerGroup.receivedAt && (
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                            >
+                                              Recibido:{' '}
+                                              {formatDate(
+                                                providerGroup.receivedAt,
+                                              )}
+                                            </Typography>
+                                          )}
 
-                                                    <Typography
-                                                      fontWeight={
-                                                        800
-                                                      }
-                                                      color="primary.main"
-                                                    >
-                                                      Subtotal:{' '}
-                                                      {formatCurrency(
-                                                        categoryGroup.subtotal,
-                                                      )}
-                                                    </Typography>
-                                                  </Stack>
+                                          {providerGroup.cancelledAt && (
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                            >
+                                              Anulado:{' '}
+                                              {formatDate(
+                                                providerGroup.cancelledAt,
+                                              )}
+                                            </Typography>
+                                          )}
 
-                                                  <TableContainer>
-                                                    <Table
-                                                      size="small"
-                                                    >
-                                                      <TableHead>
-                                                        <TableRow>
-                                                          <TableCell>
-                                                            Producto
-                                                          </TableCell>
-
-                                                          <TableCell align="right">
-                                                            Cantidad
-                                                          </TableCell>
-
-                                                          <TableCell align="right">
-                                                            Precio
-                                                            unitario
-                                                          </TableCell>
-
-                                                          <TableCell align="right">
-                                                            Subtotal
-                                                          </TableCell>
-                                                        </TableRow>
-                                                      </TableHead>
-
-                                                      <TableBody>
-                                                        {categoryGroup.details.map(
-                                                          (
-                                                            detail,
-                                                          ) => (
-                                                            <TableRow
-                                                              key={
-                                                                detail.id ||
-                                                                detail.productId
-                                                              }
-                                                            >
-                                                              <TableCell>
-                                                                <Typography
-                                                                  fontWeight={
-                                                                    700
-                                                                  }
-                                                                >
-                                                                  {
-                                                                    detail.productName
-                                                                  }
-                                                                </Typography>
-                                                              </TableCell>
-
-                                                              <TableCell align="right">
-                                                                {
-                                                                  detail.quantity
-                                                                }
-                                                              </TableCell>
-
-                                                              <TableCell align="right">
-                                                                {formatCurrency(
-                                                                  detail.unitPrice,
-                                                                )}
-                                                              </TableCell>
-
-                                                              <TableCell align="right">
-                                                                <Typography
-                                                                  fontWeight={
-                                                                    800
-                                                                  }
-                                                                >
-                                                                  {formatCurrency(
-                                                                    detail.subtotal,
-                                                                  )}
-                                                                </Typography>
-                                                              </TableCell>
-                                                            </TableRow>
-                                                          ),
-                                                        )}
-                                                      </TableBody>
-                                                    </Table>
-                                                  </TableContainer>
-                                                </Box>
-                                              ),
+                                          {isAdmin &&
+                                            providerGroup.status ===
+                                              'PENDING' && (
+                                              <Button
+                                                size="small"
+                                                variant="contained"
+                                                color="success"
+                                                startIcon={
+                                                  <CheckCircleIcon />
+                                                }
+                                                disabled={
+                                                  actionLoading
+                                                }
+                                                onClick={() =>
+                                                  setConfirmAction(
+                                                    {
+                                                      kind: 'RECEIVE_PROVIDER',
+                                                      purchase,
+                                                      providerGroup,
+                                                    },
+                                                  )
+                                                }
+                                                sx={{
+                                                  textTransform:
+                                                    'none',
+                                                  fontWeight: 800,
+                                                }}
+                                              >
+                                                Recibir
+                                              </Button>
                                             )}
-                                          </Stack>
-                                        </Box>
-                                      </Paper>
-                                    );
-                                  },
-                                )}
 
-                                {groups.length ===
-                                  0 && (
-                                  <Alert severity="warning">
-                                    La compra no tiene
-                                    proveedores registrados.
-                                  </Alert>
-                                )}
-                              </Stack>
-                            </Box>
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                    </>
-                  );
-                },
-              )}
+                                          {isAdmin &&
+                                            providerGroup.status !==
+                                              'CANCELLED' && (
+                                              <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="error"
+                                                startIcon={
+                                                  <CancelIcon />
+                                                }
+                                                disabled={
+                                                  actionLoading
+                                                }
+                                                onClick={() =>
+                                                  setConfirmAction(
+                                                    {
+                                                      kind: 'CANCEL_PROVIDER',
+                                                      purchase,
+                                                      providerGroup,
+                                                    },
+                                                  )
+                                                }
+                                                sx={{
+                                                  textTransform:
+                                                    'none',
+                                                  fontWeight: 800,
+                                                }}
+                                              >
+                                                Anular
+                                              </Button>
+                                            )}
+                                        </Stack>
+                                      </Stack>
+
+                                      <Box
+                                        sx={{
+                                          p: 2,
+                                        }}
+                                      >
+                                        <Stack spacing={2}>
+                                          {categoryGroups.map(
+                                            (
+                                              categoryGroup,
+                                            ) => (
+                                              <Box
+                                                key={
+                                                  categoryGroup.categoryId
+                                                }
+                                              >
+                                                <Stack
+                                                  direction="row"
+                                                  justifyContent="space-between"
+                                                  alignItems="center"
+                                                  sx={{
+                                                    mb: 1,
+                                                  }}
+                                                >
+                                                  <Typography
+                                                    fontWeight={
+                                                      800
+                                                    }
+                                                  >
+                                                    Categoría:{' '}
+                                                    {
+                                                      categoryGroup.categoryName
+                                                    }
+                                                  </Typography>
+
+                                                  <Typography
+                                                    fontWeight={
+                                                      800
+                                                    }
+                                                    color="primary.main"
+                                                  >
+                                                    Subtotal:{' '}
+                                                    {formatCurrency(
+                                                      categoryGroup.subtotal,
+                                                    )}
+                                                  </Typography>
+                                                </Stack>
+
+                                                <TableContainer>
+                                                  <Table size="small">
+                                                    <TableHead>
+                                                      <TableRow>
+                                                        <TableCell>
+                                                          Producto
+                                                        </TableCell>
+
+                                                        <TableCell align="right">
+                                                          Cantidad
+                                                        </TableCell>
+
+                                                        <TableCell align="right">
+                                                          Precio
+                                                          unitario
+                                                        </TableCell>
+
+                                                        <TableCell align="right">
+                                                          Subtotal
+                                                        </TableCell>
+                                                      </TableRow>
+                                                    </TableHead>
+
+                                                    <TableBody>
+                                                      {categoryGroup.details.map(
+                                                        (
+                                                          detail,
+                                                        ) => (
+                                                          <TableRow
+                                                            key={
+                                                              detail.id ||
+                                                              detail.productId
+                                                            }
+                                                          >
+                                                            <TableCell>
+                                                              <Typography
+                                                                fontWeight={
+                                                                  700
+                                                                }
+                                                              >
+                                                                {
+                                                                  detail.productName
+                                                                }
+                                                              </Typography>
+
+                                                              {detail
+                                                                .warehouseDistributions
+                                                                ?.length >
+                                                                0 && (
+                                                                <Stack
+                                                                  direction="row"
+                                                                  spacing={
+                                                                    0.5
+                                                                  }
+                                                                  useFlexGap
+                                                                  flexWrap="wrap"
+                                                                  sx={{
+                                                                    mt: 0.5,
+                                                                  }}
+                                                                >
+                                                                  {detail.warehouseDistributions.map(
+                                                                    (
+                                                                      distribution,
+                                                                    ) => (
+                                                                      <Chip
+                                                                        key={
+                                                                          distribution.id ||
+                                                                          distribution.warehouseId
+                                                                        }
+                                                                        size="small"
+                                                                        variant="outlined"
+                                                                        label={`${distribution.warehouseName}: ${distribution.quantity}`}
+                                                                      />
+                                                                    ),
+                                                                  )}
+                                                                </Stack>
+                                                              )}
+                                                            </TableCell>
+
+                                                            <TableCell align="right">
+                                                              {
+                                                                detail.quantity
+                                                              }
+                                                            </TableCell>
+
+                                                            <TableCell align="right">
+                                                              {formatCurrency(
+                                                                detail.unitPrice,
+                                                              )}
+                                                            </TableCell>
+
+                                                            <TableCell align="right">
+                                                              <Typography
+                                                                fontWeight={
+                                                                  800
+                                                                }
+                                                              >
+                                                                {formatCurrency(
+                                                                  detail.subtotal,
+                                                                )}
+                                                              </Typography>
+                                                            </TableCell>
+                                                          </TableRow>
+                                                        ),
+                                                      )}
+                                                    </TableBody>
+                                                  </Table>
+                                                </TableContainer>
+                                              </Box>
+                                            ),
+                                          )}
+                                        </Stack>
+                                      </Box>
+                                    </Paper>
+                                  );
+                                },
+                              )}
+
+                              {groups.length === 0 && (
+                                <Alert severity="warning">
+                                  La compra no tiene
+                                  proveedores registrados.
+                                </Alert>
+                              )}
+                            </Stack>
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -2051,6 +1939,7 @@ export function PurchasesPage() {
         providers={providers}
         categories={categories}
         products={products}
+        warehouses={warehouses}
         canCreateProduct={isAdmin}
         initialDraft={initialDraft}
         createdProductId={createdProductId}
@@ -2083,11 +1972,9 @@ export function PurchasesPage() {
         maxWidth="sm"
       >
         <DialogTitle>
-          {confirmAction?.kind ===
-          'RECEIVE_PROVIDER'
+          {confirmAction?.kind === 'RECEIVE_PROVIDER'
             ? 'Recibir mercadería'
-            : confirmAction?.kind ===
-                'CANCEL_PROVIDER'
+            : confirmAction?.kind === 'CANCEL_PROVIDER'
               ? 'Anular proveedor'
               : 'Anular compra completa'}
         </DialogTitle>
@@ -2097,69 +1984,16 @@ export function PurchasesPage() {
             component="div"
             sx={{ color: 'text.primary' }}
           >
-            {confirmAction?.kind ===
-              'RECEIVE_PROVIDER' && (
+            {confirmAction?.kind === 'RECEIVE_PROVIDER' && (
               <>
-                <Alert
-                  severity="warning"
-                  sx={{ mb: 2 }}
-                >
+                <Alert severity="warning" sx={{ mb: 2 }}>
                   Esta acción aumentará el stock y
-                  actualizará el precio de compra y
-                  todos los precios de venta de los
-                  productos.
+                  actualizará el precio de compra y todos
+                  los precios de venta de los productos.
                 </Alert>
 
                 <Typography>
-                  ¿Confirmas que recibiste la
-                  mercadería del proveedor{' '}
-                  <strong>
-                    {
-                      confirmAction.providerGroup
-                        .providerName
-                    }
-                  </strong>
-                  ?
-                </Typography>
-
-                <Typography
-                  sx={{ mt: 1 }}
-                  fontWeight={800}
-                >
-                  Total:{' '}
-                  {formatCurrency(
-                    confirmAction.providerGroup
-                      .total,
-                  )}
-                </Typography>
-              </>
-            )}
-
-            {confirmAction?.kind ===
-              'CANCEL_PROVIDER' && (
-              <>
-                {confirmAction.providerGroup
-                  .status === 'RECEIVED' ? (
-                  <Alert
-                    severity="error"
-                    sx={{ mb: 2 }}
-                  >
-                    El proveedor ya fue recibido.
-                    Al anularlo se descontará del
-                    stock la mercadería registrada.
-                  </Alert>
-                ) : (
-                  <Alert
-                    severity="warning"
-                    sx={{ mb: 2 }}
-                  >
-                    El proveedor será retirado del
-                    total activo de la compra.
-                  </Alert>
-                )}
-
-                <Typography>
-                  ¿Confirmas la anulación del
+                  ¿Confirmas que recibiste la mercadería del
                   proveedor{' '}
                   <strong>
                     {
@@ -2169,31 +2003,86 @@ export function PurchasesPage() {
                   </strong>
                   ?
                 </Typography>
+
+                <Stack spacing={1} sx={{ mt: 2 }}>
+                  {confirmAction.providerGroup.details.map(
+                    (detail) => (
+                      <Paper
+                        key={detail.id || detail.productId}
+                        variant="outlined"
+                        sx={{ p: 1.25 }}
+                      >
+                        <Typography fontWeight={800}>
+                          {detail.productName}
+                        </Typography>
+
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                        >
+                          {detail.warehouseDistributions
+                            ?.map(
+                              (distribution) =>
+                                `${distribution.warehouseName}: ${distribution.quantity}`,
+                            )
+                            .join(' · ') ||
+                            `Cantidad: ${detail.quantity}`}
+                        </Typography>
+                      </Paper>
+                    ),
+                  )}
+                </Stack>
+
+                <Typography sx={{ mt: 1 }} fontWeight={800}>
+                  Total:{' '}
+                  {formatCurrency(
+                    confirmAction.providerGroup.total,
+                  )}
+                </Typography>
               </>
             )}
 
-            {confirmAction?.kind ===
-              'CANCEL_PURCHASE' && (
+            {confirmAction?.kind === 'CANCEL_PROVIDER' && (
               <>
-                <Alert
-                  severity="error"
-                  sx={{ mb: 2 }}
-                >
-                  La compra completa será anulada.
-                  Los proveedores recibidos
-                  descontarán nuevamente sus
-                  cantidades del stock.
+                {confirmAction.providerGroup.status ===
+                'RECEIVED' ? (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    El proveedor ya fue recibido. Al
+                    anularlo se descontará del stock la
+                    mercadería registrada.
+                  </Alert>
+                ) : (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    El proveedor será retirado del total
+                    activo de la compra.
+                  </Alert>
+                )}
+
+                <Typography>
+                  ¿Confirmas la anulación del proveedor{' '}
+                  <strong>
+                    {
+                      confirmAction.providerGroup
+                        .providerName
+                    }
+                  </strong>
+                  ?
+                </Typography>
+              </>
+            )}
+
+            {confirmAction?.kind === 'CANCEL_PURCHASE' && (
+              <>
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  La compra completa será anulada. Los
+                  proveedores recibidos descontarán
+                  nuevamente sus cantidades del stock.
                 </Alert>
 
                 <Typography>
-                  ¿Confirmas la anulación de la
-                  compra{' '}
+                  ¿Confirmas la anulación de la compra{' '}
                   <strong>
-                    #
-                    {confirmAction.purchase.id.slice(
-                      0,
-                      8,
-                    )}
+                    #{confirmAction.purchase.id.slice(0, 8)}
                   </strong>
                   ?
                 </Typography>
@@ -2204,9 +2093,7 @@ export function PurchasesPage() {
 
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button
-            onClick={() =>
-              setConfirmAction(null)
-            }
+            onClick={() => setConfirmAction(null)}
             disabled={actionLoading}
           >
             Volver
@@ -2215,8 +2102,7 @@ export function PurchasesPage() {
           <Button
             variant="contained"
             color={
-              confirmAction?.kind ===
-              'RECEIVE_PROVIDER'
+              confirmAction?.kind === 'RECEIVE_PROVIDER'
                 ? 'success'
                 : 'error'
             }
@@ -2225,8 +2111,7 @@ export function PurchasesPage() {
           >
             {actionLoading
               ? 'Procesando...'
-              : confirmAction?.kind ===
-                  'RECEIVE_PROVIDER'
+              : confirmAction?.kind === 'RECEIVE_PROVIDER'
                 ? 'Confirmar recepción'
                 : 'Confirmar anulación'}
           </Button>

@@ -1,12 +1,16 @@
 export type PurchaseStatus =
-  | 'PENDING'
-  | 'RECEIVED'
-  | 'CANCELLED';
+  'PENDING' | 'RECEIVED' | 'CANCELLED';
 
 export type PurchaseProviderStatus =
-  | 'PENDING'
-  | 'RECEIVED'
-  | 'CANCELLED';
+  'PENDING' | 'RECEIVED' | 'CANCELLED';
+
+export interface PurchaseWarehouseDistribution {
+  id?: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  quantity: number;
+}
 
 export interface PurchaseDetail {
   id: string;
@@ -22,6 +26,7 @@ export interface PurchaseDetail {
   priceEspecial?: number | null;
   priceMayorista?: number | null;
   minQuantityWholesale?: number | null;
+  warehouseDistributions: PurchaseWarehouseDistribution[];
 }
 
 export interface PurchaseProviderGroup {
@@ -58,6 +63,10 @@ export interface PurchaseDetailRequest {
   priceEspecial: number;
   priceMayorista?: number | null;
   minQuantityWholesale?: number | null;
+  warehouseDistributions: Array<{
+    warehouseId: string;
+    quantity: number;
+  }>;
 }
 
 export interface CreatePurchaseRequest {
