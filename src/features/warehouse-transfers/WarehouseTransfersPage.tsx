@@ -139,6 +139,43 @@ export function WarehouseTransfersPage() {
     [availableStocks],
   );
 
+  const areDetailsValid = useMemo(() => {
+    if (details.length === 0) {
+      return false;
+    }
+
+    const productIds = details.map((detail) => detail.productId);
+    const hasRepeatedProducts =
+      new Set(productIds).size !== productIds.length;
+
+    if (hasRepeatedProducts) {
+      return false;
+    }
+
+    return details.every((detail) => {
+      const stock = stocksByProductId.get(detail.productId);
+      const quantity = Number(detail.quantity);
+
+      return (
+        Boolean(detail.productId) &&
+        detail.quantity.trim() !== '' &&
+        Number.isFinite(quantity) &&
+        quantity > 0 &&
+        Boolean(stock) &&
+        quantity <= (stock?.availableStock ?? 0)
+      );
+    });
+  }, [details, stocksByProductId]);
+
+  const canAddProduct =
+    areDetailsValid && details.length < availableStocks.length;
+
+  const canSubmitTransfer =
+    Boolean(originWarehouseId) &&
+    Boolean(destinationWarehouseId) &&
+    originWarehouseId !== destinationWarehouseId &&
+    areDetailsValid;
+
   const refreshData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
@@ -227,6 +264,18 @@ export function WarehouseTransfersPage() {
         ? current
         : current.filter((detail) => detail.key !== key),
     );
+  };
+
+  const addDetail = () => {
+    if (!areDetailsValid) {
+      setActionError(
+        'Selecciona un producto e ingresa una cantidad válida antes de agregar otro.',
+      );
+      return;
+    }
+
+    setActionError(null);
+    setDetails((current) => [...current, createDraftDetail()]);
   };
 
   const submitTransfer = () => {
@@ -612,10 +661,8 @@ export function WarehouseTransfersPage() {
                 </Typography>
                 <Button
                   startIcon={<AddIcon />}
-                  onClick={() =>
-                    setDetails((current) => [...current, createDraftDetail()])
-                  }
-                  disabled={details.length >= availableStocks.length}
+                  onClick={addDetail}
+                  disabled={!canAddProduct}
                 >
                   Agregar producto
                 </Button>
@@ -751,7 +798,8 @@ export function WarehouseTransfersPage() {
             disabled={
               createMutation.isPending ||
               originQuery.isLoading ||
-              availableStocks.length === 0
+              availableStocks.length === 0 ||
+              !canSubmitTransfer
             }
           >
             {createMutation.isPending
