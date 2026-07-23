@@ -17,7 +17,12 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Provider } from '../../types/provider.types';
 import type {
   Category,
@@ -27,6 +32,7 @@ import type {
   CreatePurchaseRequest,
   Purchase,
 } from '../../types/purchase.types';
+import type { Warehouse } from '../../types/warehouse.types';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface PurchaseFormDialogProps {
@@ -35,6 +41,7 @@ interface PurchaseFormDialogProps {
   providers: Provider[];
   categories: Category[];
   products: Product[];
+  warehouses: Warehouse[];
   loading?: boolean;
   error?: string | null;
   canCreateProduct?: boolean;
@@ -42,9 +49,7 @@ interface PurchaseFormDialogProps {
   createdProductId?: string | null;
   onClose: () => void;
   onCreateNewProduct?: (draft: PurchaseFormDraft) => void;
-  onSubmit: (
-    data: CreatePurchaseRequest,
-  ) => void;
+  onSubmit: (data: CreatePurchaseRequest) => void;
 }
 
 export interface DraftDetail {
@@ -58,6 +63,10 @@ export interface DraftDetail {
   priceEspecial: number;
   priceMayorista: number | null;
   minQuantityWholesale: number | null;
+  warehouseDistributions: Array<{
+    warehouseId: string;
+    quantity: number;
+  }>;
 }
 
 export interface PurchaseFormDraft {
@@ -103,18 +112,14 @@ const decimalInputProps = {
 };
 
 function roundMoney(value: number) {
-  return Math.round(
-    (value + Number.EPSILON) * 100,
-  ) / 100;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function calculatePrice(
   purchasePrice: number,
   percentage: number,
 ) {
-  return roundMoney(
-    purchasePrice * (1 + percentage / 100),
-  );
+  return roundMoney(purchasePrice * (1 + percentage / 100));
 }
 
 function calculateMargin(
@@ -130,9 +135,7 @@ function calculateMargin(
     Math.min(
       100,
       Math.round(
-        ((salePrice - purchasePrice) /
-          purchasePrice) *
-          100,
+        ((salePrice - purchasePrice) / purchasePrice) * 100,
       ),
     ),
   );
@@ -144,6 +147,7 @@ export function PurchaseFormDialog({
   providers,
   categories,
   products,
+  warehouses,
   loading = false,
   error,
   canCreateProduct = false,
@@ -154,37 +158,50 @@ export function PurchaseFormDialog({
   onSubmit,
 }: PurchaseFormDialogProps) {
   const initializedOpenRef = useRef(false);
-  const [observations, setObservations] =
-    useState('');
-  const [details, setDetails] = useState<
-    DraftDetail[]
-  >([]);
+  const [observations, setObservations] = useState('');
+  const [details, setDetails] = useState<DraftDetail[]>([]);
 
-  const [providerId, setProviderId] =
-    useState('');
-  const [categoryId, setCategoryId] =
-    useState('');
-  const [productId, setProductId] =
-    useState('');
-  const [quantity, setQuantity] =
-    useState<number | ''>(1);
-  const [unitPrice, setUnitPrice] =
-    useState<number | ''>('');
+  const [providerId, setProviderId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [productId, setProductId] = useState('');
+  const [quantity, setQuantity] = useState<number | ''>(1);
+  const [unitPrice, setUnitPrice] = useState<number | ''>(
+    '',
+  );
   const [marginPercentage, setMarginPercentage] =
     useState(10);
-  const [priceNormal, setPriceNormal] =
-    useState<number | ''>('');
-  const [priceCamino, setPriceCamino] =
-    useState<number | ''>('');
-  const [priceEspecial, setPriceEspecial] =
-    useState<number | ''>('');
-  const [priceMayorista, setPriceMayorista] =
-    useState<number | ''>('');
+  const [priceNormal, setPriceNormal] = useState<
+    number | ''
+  >('');
+  const [priceCamino, setPriceCamino] = useState<
+    number | ''
+  >('');
+  const [priceEspecial, setPriceEspecial] = useState<
+    number | ''
+  >('');
+  const [priceMayorista, setPriceMayorista] = useState<
+    number | ''
+  >('');
   const [minQuantityWholesale, setMinQuantityWholesale] =
     useState<number | ''>('');
 
-  const [localError, setLocalError] =
-    useState<string | null>(null);
+  const [localError, setLocalError] = useState<
+    string | null
+  >(null);
+
+  const activeWarehouses = useMemo(
+    () =>
+      warehouses.filter((warehouse) => warehouse.isActive),
+    [warehouses],
+  );
+
+  const defaultWarehouse = useMemo(
+    () =>
+      activeWarehouses.find(
+        (warehouse) => warehouse.isDefault,
+      ) || null,
+    [activeWarehouses],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -200,7 +217,22 @@ export function PurchaseFormDialog({
 
     if (initialDraft) {
       setObservations(initialDraft.observations);
-      setDetails(initialDraft.details);
+      setDetails(
+        initialDraft.details.map((detail) => ({
+          ...detail,
+          warehouseDistributions: detail
+            .warehouseDistributions?.length
+            ? detail.warehouseDistributions
+            : defaultWarehouse
+              ? [
+                  {
+                    warehouseId: defaultWarehouse.id,
+                    quantity: detail.quantity,
+                  },
+                ]
+              : [],
+        })),
+      );
       setProviderId(initialDraft.providerId);
       setCategoryId(initialDraft.categoryId);
       setProductId(initialDraft.productId);
@@ -252,50 +284,63 @@ export function PurchaseFormDialog({
       return;
     }
 
-    setObservations(
-      purchase?.observations || '',
-    );
+    setObservations(purchase?.observations || '');
 
     const initialDetails =
-      purchase?.providerGroups.flatMap(
-        (group) =>
-          group.details.map((detail) => {
-            const product = products.find(
-              (item) => item.id === detail.productId,
-            );
-            const fallbackPrice = calculatePrice(
-              detail.unitPrice,
-              10,
-            );
+      purchase?.providerGroups.flatMap((group) =>
+        group.details.map((detail) => {
+          const product = products.find(
+            (item) => item.id === detail.productId,
+          );
+          const fallbackPrice = calculatePrice(
+            detail.unitPrice,
+            10,
+          );
 
-            return {
-              productId: detail.productId,
-              providerId: group.providerId,
-              categoryId: detail.categoryId,
-              quantity: detail.quantity,
-              unitPrice: detail.unitPrice,
-              priceNormal:
-                detail.priceNormal ??
-                product?.priceNormal ??
-                fallbackPrice,
-              priceCamino:
-                detail.priceCamino ??
-                product?.priceCamino ??
-                fallbackPrice,
-              priceEspecial:
-                detail.priceEspecial ??
-                product?.priceEspecial ??
-                fallbackPrice,
-              priceMayorista:
-                detail.priceMayorista ??
-                product?.priceMayorista ??
-                fallbackPrice,
-              minQuantityWholesale:
-                detail.minQuantityWholesale ??
-                product?.minQuantityWholesale ??
-                1,
-            };
-          }),
+          return {
+            productId: detail.productId,
+            providerId: group.providerId,
+            categoryId: detail.categoryId,
+            quantity: detail.quantity,
+            unitPrice: detail.unitPrice,
+            priceNormal:
+              detail.priceNormal ??
+              product?.priceNormal ??
+              fallbackPrice,
+            priceCamino:
+              detail.priceCamino ??
+              product?.priceCamino ??
+              fallbackPrice,
+            priceEspecial:
+              detail.priceEspecial ??
+              product?.priceEspecial ??
+              fallbackPrice,
+            priceMayorista:
+              detail.priceMayorista ??
+              product?.priceMayorista ??
+              fallbackPrice,
+            minQuantityWholesale:
+              detail.minQuantityWholesale ??
+              product?.minQuantityWholesale ??
+              1,
+            warehouseDistributions: detail
+              .warehouseDistributions?.length
+              ? detail.warehouseDistributions.map(
+                  (distribution) => ({
+                    warehouseId: distribution.warehouseId,
+                    quantity: distribution.quantity,
+                  }),
+                )
+              : defaultWarehouse
+                ? [
+                    {
+                      warehouseId: defaultWarehouse.id,
+                      quantity: detail.quantity,
+                    },
+                  ]
+                : [],
+          };
+        }),
       ) || [];
 
     setDetails(initialDetails);
@@ -317,13 +362,13 @@ export function PurchaseFormDialog({
     initialDraft,
     createdProductId,
     products,
+    defaultWarehouse,
   ]);
 
   const providerProducts = useMemo(
     () =>
       products.filter(
-        (product) =>
-          product.providerId === providerId,
+        (product) => product.providerId === providerId,
       ),
     [products, providerId],
   );
@@ -332,8 +377,7 @@ export function PurchaseFormDialog({
     () =>
       categories.filter((category) =>
         providerProducts.some(
-          (product) =>
-            product.categoryId === category.id,
+          (product) => product.categoryId === category.id,
         ),
       ),
     [categories, providerProducts],
@@ -342,8 +386,7 @@ export function PurchaseFormDialog({
   const availableProducts = useMemo(
     () =>
       providerProducts.filter(
-        (product) =>
-          product.categoryId === categoryId,
+        (product) => product.categoryId === categoryId,
       ),
     [providerProducts, categoryId],
   );
@@ -373,16 +416,12 @@ export function PurchaseFormDialog({
   const productMap = useMemo(
     () =>
       new Map(
-        products.map((product) => [
-          product.id,
-          product,
-        ]),
+        products.map((product) => [product.id, product]),
       ),
     [products],
   );
 
-  const selectedProduct =
-    productMap.get(productId) || null;
+  const selectedProduct = productMap.get(productId) || null;
 
   const setCalculatedPrices = (
     purchasePrice: number,
@@ -447,39 +486,31 @@ export function PurchaseFormDialog({
     >();
 
     for (const detail of details) {
-      let providerGroup = groups.get(
-        detail.providerId,
-      );
+      let providerGroup = groups.get(detail.providerId);
 
       if (!providerGroup) {
         providerGroup = {
           providerId: detail.providerId,
           providerName:
-            providerMap.get(
-              detail.providerId,
-            ) || 'Proveedor',
+            providerMap.get(detail.providerId) ||
+            'Proveedor',
           categories: new Map(),
           total: 0,
         };
 
-        groups.set(
-          detail.providerId,
-          providerGroup,
-        );
+        groups.set(detail.providerId, providerGroup);
       }
 
-      let categoryGroup =
-        providerGroup.categories.get(
-          detail.categoryId,
-        );
+      let categoryGroup = providerGroup.categories.get(
+        detail.categoryId,
+      );
 
       if (!categoryGroup) {
         categoryGroup = {
           categoryId: detail.categoryId,
           categoryName:
-            categoryMap.get(
-              detail.categoryId,
-            ) || 'Sin categoría',
+            categoryMap.get(detail.categoryId) ||
+            'Sin categoría',
           details: [],
           subtotal: 0,
         };
@@ -505,29 +536,21 @@ export function PurchaseFormDialog({
     }
 
     return Array.from(groups.values());
-  }, [
-    details,
-    providerMap,
-    categoryMap,
-  ]);
+  }, [details, providerMap, categoryMap]);
 
   const generalTotal = useMemo(
     () =>
       roundMoney(
         details.reduce(
           (sum, detail) =>
-            sum +
-            detail.quantity *
-              detail.unitPrice,
+            sum + detail.quantity * detail.unitPrice,
           0,
         ),
       ),
     [details],
   );
 
-  const handleProviderChange = (
-    value: string,
-  ) => {
+  const handleProviderChange = (value: string) => {
     // Solo se limpian los selectores actuales.
     // Los productos agregados no se modifican.
     setProviderId(value);
@@ -535,16 +558,12 @@ export function PurchaseFormDialog({
     resetProductFields();
   };
 
-  const handleCategoryChange = (
-    value: string,
-  ) => {
+  const handleCategoryChange = (value: string) => {
     setCategoryId(value);
     resetProductFields();
   };
 
-  const handleProductChange = (
-    product: Product | null,
-  ) => {
+  const handleProductChange = (product: Product | null) => {
     setProductId(product?.id || '');
 
     if (!product) {
@@ -580,9 +599,7 @@ export function PurchaseFormDialog({
     );
   };
 
-  const handleUnitPriceChange = (
-    value: string,
-  ) => {
+  const handleUnitPriceChange = (value: string) => {
     if (value === '') {
       setUnitPrice('');
       setPriceNormal('');
@@ -596,23 +613,15 @@ export function PurchaseFormDialog({
     setUnitPrice(numericValue);
 
     if (numericValue > 0) {
-      setCalculatedPrices(
-        numericValue,
-        marginPercentage,
-      );
+      setCalculatedPrices(numericValue, marginPercentage);
     }
   };
 
-  const handleMarginChange = (
-    percentage: number,
-  ) => {
+  const handleMarginChange = (percentage: number) => {
     setMarginPercentage(percentage);
 
     if (unitPrice !== '' && unitPrice > 0) {
-      setCalculatedPrices(
-        Number(unitPrice),
-        percentage,
-      );
+      setCalculatedPrices(Number(unitPrice), percentage);
     }
   };
 
@@ -629,23 +638,23 @@ export function PurchaseFormDialog({
       minQuantityWholesale,
     );
 
-    if (
-      !providerId ||
-      !categoryId ||
-      !productId
-    ) {
+    if (!providerId || !categoryId || !productId) {
       setLocalError(
         'Selecciona proveedor, categoría y producto',
       );
       return;
     }
 
-    if (
-      parsedQuantity <= 0 ||
-      parsedPrice <= 0
-    ) {
+    if (parsedQuantity <= 0 || parsedPrice <= 0) {
       setLocalError(
         'La cantidad y el precio deben ser mayores a cero',
+      );
+      return;
+    }
+
+    if (!defaultWarehouse) {
+      setLocalError(
+        'No existe un almacén predeterminado activo',
       );
       return;
     }
@@ -663,9 +672,7 @@ export function PurchaseFormDialog({
     }
 
     if (
-      !Number.isInteger(
-        parsedMinQuantityWholesale,
-      ) ||
+      !Number.isInteger(parsedMinQuantityWholesale) ||
       parsedMinQuantityWholesale <= 0
     ) {
       setLocalError(
@@ -674,42 +681,56 @@ export function PurchaseFormDialog({
       return;
     }
 
-    const existingIndex =
-      details.findIndex(
-        (detail) =>
-          detail.productId === productId,
-      );
+    const existingIndex = details.findIndex(
+      (detail) => detail.productId === productId,
+    );
 
     if (existingIndex >= 0) {
       setDetails((current) =>
-        current.map((detail, index) =>
-          index === existingIndex
-            ? {
-                ...detail,
+        current.map((detail, index) => {
+          if (index !== existingIndex) {
+            return detail;
+          }
+
+          const currentDefaultQuantity =
+            detail.warehouseDistributions.find(
+              (distribution) =>
+                distribution.warehouseId ===
+                defaultWarehouse.id,
+            )?.quantity || 0;
+
+          const otherDistributions =
+            detail.warehouseDistributions.filter(
+              (distribution) =>
+                distribution.warehouseId !==
+                defaultWarehouse.id,
+            );
+
+          return {
+            ...detail,
+            quantity: roundMoney(
+              detail.quantity + parsedQuantity,
+            ),
+            unitPrice: roundMoney(parsedPrice),
+            priceNormal: roundMoney(parsedPriceNormal),
+            priceCamino: roundMoney(parsedPriceCamino),
+            priceEspecial: roundMoney(parsedPriceEspecial),
+            priceMayorista: roundMoney(
+              parsedPriceMayorista,
+            ),
+            minQuantityWholesale:
+              parsedMinQuantityWholesale,
+            warehouseDistributions: [
+              ...otherDistributions,
+              {
+                warehouseId: defaultWarehouse.id,
                 quantity: roundMoney(
-                  detail.quantity +
-                    parsedQuantity,
+                  currentDefaultQuantity + parsedQuantity,
                 ),
-                unitPrice: roundMoney(
-                  parsedPrice,
-                ),
-                priceNormal: roundMoney(
-                  parsedPriceNormal,
-                ),
-                priceCamino: roundMoney(
-                  parsedPriceCamino,
-                ),
-                priceEspecial: roundMoney(
-                  parsedPriceEspecial,
-                ),
-                priceMayorista: roundMoney(
-                  parsedPriceMayorista,
-                ),
-                minQuantityWholesale:
-                  parsedMinQuantityWholesale,
-              }
-            : detail,
-        ),
+              },
+            ],
+          };
+        }),
       );
     } else {
       setDetails((current) => [
@@ -720,20 +741,17 @@ export function PurchaseFormDialog({
           categoryId,
           quantity: parsedQuantity,
           unitPrice: roundMoney(parsedPrice),
-          priceNormal: roundMoney(
-            parsedPriceNormal,
-          ),
-          priceCamino: roundMoney(
-            parsedPriceCamino,
-          ),
-          priceEspecial: roundMoney(
-            parsedPriceEspecial,
-          ),
-          priceMayorista: roundMoney(
-            parsedPriceMayorista,
-          ),
-          minQuantityWholesale:
-            parsedMinQuantityWholesale,
+          priceNormal: roundMoney(parsedPriceNormal),
+          priceCamino: roundMoney(parsedPriceCamino),
+          priceEspecial: roundMoney(parsedPriceEspecial),
+          priceMayorista: roundMoney(parsedPriceMayorista),
+          minQuantityWholesale: parsedMinQuantityWholesale,
+          warehouseDistributions: [
+            {
+              warehouseId: defaultWarehouse.id,
+              quantity: parsedQuantity,
+            },
+          ],
         },
       ]);
     }
@@ -749,18 +767,88 @@ export function PurchaseFormDialog({
     const numericValue = Number(value);
 
     setDetails((current) =>
-      current.map((detail) =>
-        detail.productId ===
-        productIdToUpdate
-          ? {
-              ...detail,
-              [field]:
-                value === ''
-                  ? 0
-                  : numericValue,
-            }
-          : detail,
-      ),
+      current.map((detail) => {
+        if (detail.productId !== productIdToUpdate) {
+          return detail;
+        }
+
+        const nextValue = value === '' ? 0 : numericValue;
+
+        if (field !== 'quantity' || !defaultWarehouse) {
+          return {
+            ...detail,
+            [field]: nextValue,
+          };
+        }
+
+        const otherDistributions =
+          detail.warehouseDistributions.filter(
+            (distribution) =>
+              distribution.warehouseId !==
+              defaultWarehouse.id,
+          );
+
+        const otherQuantity = otherDistributions.reduce(
+          (sum, distribution) =>
+            sum + distribution.quantity,
+          0,
+        );
+
+        const defaultQuantity = roundMoney(
+          nextValue - otherQuantity,
+        );
+
+        return {
+          ...detail,
+          quantity: nextValue,
+          warehouseDistributions:
+            defaultQuantity > 0
+              ? [
+                  ...otherDistributions,
+                  {
+                    warehouseId: defaultWarehouse.id,
+                    quantity: defaultQuantity,
+                  },
+                ]
+              : otherDistributions,
+        };
+      }),
+    );
+  };
+
+  const updateWarehouseDistribution = (
+    productIdToUpdate: string,
+    warehouseId: string,
+    value: string,
+  ) => {
+    const quantityValue = value === '' ? 0 : Number(value);
+
+    setDetails((current) =>
+      current.map((detail) => {
+        if (detail.productId !== productIdToUpdate) {
+          return detail;
+        }
+
+        const otherDistributions =
+          detail.warehouseDistributions.filter(
+            (distribution) =>
+              distribution.warehouseId !== warehouseId,
+          );
+
+        return {
+          ...detail,
+          warehouseDistributions:
+            quantityValue > 0
+              ? [
+                  ...otherDistributions,
+                  {
+                    warehouseId,
+                    quantity: quantityValue,
+                  },
+                ]
+              : otherDistributions,
+        };
+      }),
     );
   };
 
@@ -774,22 +862,17 @@ export function PurchaseFormDialog({
         detail.productId === productIdToUpdate
           ? {
               ...detail,
-              [field]:
-                value === '' ? null : Number(value),
+              [field]: value === '' ? null : Number(value),
             }
           : detail,
       ),
     );
   };
 
-  const removeDetail = (
-    productIdToRemove: string,
-  ) => {
+  const removeDetail = (productIdToRemove: string) => {
     setDetails((current) =>
       current.filter(
-        (detail) =>
-          detail.productId !==
-          productIdToRemove,
+        (detail) => detail.productId !== productIdToRemove,
       ),
     );
   };
@@ -798,14 +881,19 @@ export function PurchaseFormDialog({
     setLocalError(null);
 
     if (details.length === 0) {
-      setLocalError(
-        'Agrega al menos un producto',
-      );
+      setLocalError('Agrega al menos un producto');
       return;
     }
 
-    const invalid = details.some(
-      (detail) =>
+    const invalid = details.some((detail) => {
+      const distributedQuantity =
+        detail.warehouseDistributions.reduce(
+          (sum, distribution) =>
+            sum + distribution.quantity,
+          0,
+        );
+
+      return (
         detail.quantity <= 0 ||
         detail.unitPrice <= 0 ||
         detail.priceNormal <= 0 ||
@@ -814,19 +902,22 @@ export function PurchaseFormDialog({
         !detail.priceMayorista ||
         detail.priceMayorista <= 0 ||
         !detail.minQuantityWholesale ||
-        detail.minQuantityWholesale <= 0,
-    );
+        detail.minQuantityWholesale <= 0 ||
+        detail.warehouseDistributions.length === 0 ||
+        Math.abs(distributedQuantity - detail.quantity) >
+          0.000001
+      );
+    });
 
     if (invalid) {
       setLocalError(
-        'Todos los productos deben tener cantidades y precios válidos',
+        'Revisa las cantidades, los precios y la distribución por almacén de cada producto',
       );
       return;
     }
 
     onSubmit({
-      observations:
-        observations.trim() || undefined,
+      observations: observations.trim() || undefined,
       details: details.map((detail) => ({
         productId: detail.productId,
         quantity: detail.quantity,
@@ -836,6 +927,13 @@ export function PurchaseFormDialog({
         priceEspecial: detail.priceEspecial,
         priceMayorista: detail.priceMayorista,
         minQuantityWholesale: detail.minQuantityWholesale,
+        warehouseDistributions:
+          detail.warehouseDistributions.map(
+            (distribution) => ({
+              warehouseId: distribution.warehouseId,
+              quantity: distribution.quantity,
+            }),
+          ),
       })),
     });
   };
@@ -855,11 +953,15 @@ export function PurchaseFormDialog({
 
       <DialogContent dividers>
         {(error || localError) && (
-          <Alert
-            severity="error"
-            sx={{ mb: 2 }}
-          >
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error || localError}
+          </Alert>
+        )}
+
+        {!defaultWarehouse && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            No existe un almacén predeterminado activo.
+            Debes configurarlo antes de registrar compras.
           </Alert>
         )}
 
@@ -870,9 +972,7 @@ export function PurchaseFormDialog({
           label="Observación general"
           value={observations}
           onChange={(event) =>
-            setObservations(
-              event.target.value,
-            )
+            setObservations(event.target.value)
           }
           disabled={loading}
           sx={{ mb: 3 }}
@@ -890,10 +990,7 @@ export function PurchaseFormDialog({
             },
           }}
         >
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 800 }}
-          >
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
             Agregar producto a la compra
           </Typography>
 
@@ -916,10 +1013,7 @@ export function PurchaseFormDialog({
           )}
         </Stack>
 
-        <Paper
-          variant="outlined"
-          sx={{ p: 2, mb: 3 }}
-        >
+        <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
           <Box
             sx={{
               display: 'grid',
@@ -936,15 +1030,11 @@ export function PurchaseFormDialog({
               label="Proveedor"
               value={providerId}
               onChange={(event) =>
-                handleProviderChange(
-                  event.target.value,
-                )
+                handleProviderChange(event.target.value)
               }
               disabled={loading}
             >
-              <MenuItem value="">
-                Seleccionar
-              </MenuItem>
+              <MenuItem value="">Seleccionar</MenuItem>
 
               {providers.map((provider) => (
                 <MenuItem
@@ -961,28 +1051,20 @@ export function PurchaseFormDialog({
               label="Categoría"
               value={categoryId}
               onChange={(event) =>
-                handleCategoryChange(
-                  event.target.value,
-                )
+                handleCategoryChange(event.target.value)
               }
-              disabled={
-                loading || !providerId
-              }
+              disabled={loading || !providerId}
             >
-              <MenuItem value="">
-                Seleccionar
-              </MenuItem>
+              <MenuItem value="">Seleccionar</MenuItem>
 
-              {availableCategories.map(
-                (category) => (
-                  <MenuItem
-                    key={category.id}
-                    value={category.id}
-                  >
-                    {category.name}
-                  </MenuItem>
-                ),
-              )}
+              {availableCategories.map((category) => (
+                <MenuItem
+                  key={category.id}
+                  value={category.id}
+                >
+                  {category.name}
+                </MenuItem>
+              ))}
             </TextField>
 
             <Autocomplete
@@ -992,20 +1074,13 @@ export function PurchaseFormDialog({
                 handleProductChange(product)
               }
               getOptionLabel={(product) =>
-                `${product.name}${
-                  product.weight
-                    ? ` - ${product.weight}`
-                    : ''
-                }`
+                `${product.name}${product.weight ? ` - ${product.weight}` : ''}`
               }
-              isOptionEqualToValue={(
-                option,
-                value,
-              ) => option.id === value.id}
+              isOptionEqualToValue={(option, value) =>
+                option.id === value.id
+              }
               noOptionsText="No se encontraron productos"
-              disabled={
-                loading || !categoryId
-              }
+              disabled={loading || !categoryId}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -1023,9 +1098,7 @@ export function PurchaseFormDialog({
                 setQuantity(
                   event.target.value === ''
                     ? ''
-                    : Number(
-                        event.target.value,
-                      ),
+                    : Number(event.target.value),
                 )
               }
               inputProps={decimalInputProps}
@@ -1037,9 +1110,7 @@ export function PurchaseFormDialog({
               label="Precio compra"
               value={unitPrice}
               onChange={(event) =>
-                handleUnitPriceChange(
-                  event.target.value,
-                )
+                handleUnitPriceChange(event.target.value)
               }
               inputProps={decimalInputProps}
               disabled={loading}
@@ -1206,226 +1277,330 @@ export function PurchaseFormDialog({
         </Paper>
 
         <Stack spacing={2}>
-          {groupedDetails.map(
-            (providerGroup) => (
-              <Paper
-                key={
-                  providerGroup.providerId
-                }
-                variant="outlined"
-                sx={{ overflow: 'hidden' }}
+          {groupedDetails.map((providerGroup) => (
+            <Paper
+              key={providerGroup.providerId}
+              variant="outlined"
+              sx={{ overflow: 'hidden' }}
+            >
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  bgcolor: '#eef7f2',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
               >
+                <Typography fontWeight={900}>
+                  Proveedor: {providerGroup.providerName}
+                </Typography>
+
+                <Typography fontWeight={900}>
+                  {formatCurrency(providerGroup.total)}
+                </Typography>
+              </Box>
+
+              {Array.from(
+                providerGroup.categories.values(),
+              ).map((categoryGroup) => (
                 <Box
+                  key={categoryGroup.categoryId}
                   sx={{
-                    px: 2,
-                    py: 1.5,
-                    bgcolor: '#eef7f2',
-                    display: 'flex',
-                    justifyContent:
-                      'space-between',
+                    p: 2,
+                    borderTop: '1px solid #edf0f2',
                   }}
                 >
-                  <Typography fontWeight={900}>
-                    Proveedor:{' '}
-                    {
-                      providerGroup.providerName
-                    }
-                  </Typography>
-
-                  <Typography fontWeight={900}>
-                    {formatCurrency(
-                      providerGroup.total,
-                    )}
-                  </Typography>
-                </Box>
-
-                {Array.from(
-                  providerGroup.categories.values(),
-                ).map((categoryGroup) => (
-                  <Box
-                    key={
-                      categoryGroup.categoryId
-                    }
-                    sx={{
-                      p: 2,
-                      borderTop:
-                        '1px solid #edf0f2',
-                    }}
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{ mb: 1 }}
                   >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      sx={{ mb: 1 }}
-                    >
-                      <Typography
-                        fontWeight={800}
-                      >
-                        Categoría:{' '}
-                        {
-                          categoryGroup.categoryName
-                        }
-                      </Typography>
+                    <Typography fontWeight={800}>
+                      Categoría:{' '}
+                      {categoryGroup.categoryName}
+                    </Typography>
 
-                      <Typography
-                        fontWeight={800}
-                      >
-                        Subtotal:{' '}
-                        {formatCurrency(
-                          categoryGroup.subtotal,
-                        )}
-                      </Typography>
-                    </Stack>
+                    <Typography fontWeight={800}>
+                      Subtotal:{' '}
+                      {formatCurrency(
+                        categoryGroup.subtotal,
+                      )}
+                    </Typography>
+                  </Stack>
 
-                    <Stack spacing={1}>
-                      {categoryGroup.details.map(
-                        (detail) => {
-                          const product =
-                            productMap.get(
-                              detail.productId,
-                            );
+                  <Stack spacing={1}>
+                    {categoryGroup.details.map((detail) => {
+                      const product = productMap.get(
+                        detail.productId,
+                      );
+                      const distributedQuantity =
+                        detail.warehouseDistributions.reduce(
+                          (sum, distribution) =>
+                            sum + distribution.quantity,
+                          0,
+                        );
+                      const distributionMatches =
+                        Math.abs(
+                          distributedQuantity -
+                            detail.quantity,
+                        ) <= 0.000001;
 
-                          return (
-                            <Paper
-                              key={
-                                detail.productId
+                      return (
+                        <Paper
+                          key={detail.productId}
+                          variant="outlined"
+                          sx={{
+                            p: 1.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: {
+                                xs: '1fr',
+                                md: '2fr 1fr 1fr 1fr auto',
+                              },
+                              gap: 1,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Typography fontWeight={700}>
+                              {product?.name ||
+                                detail.productId}
+                            </Typography>
+
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="Cantidad"
+                              value={detail.quantity}
+                              onChange={(event) =>
+                                updateDetail(
+                                  detail.productId,
+                                  'quantity',
+                                  event.target.value,
+                                )
                               }
-                              variant="outlined"
+                              inputProps={decimalInputProps}
+                            />
+
+                            <TextField
+                              size="small"
+                              type="number"
+                              label="P. compra"
+                              value={detail.unitPrice}
+                              onChange={(event) =>
+                                updateDetail(
+                                  detail.productId,
+                                  'unitPrice',
+                                  event.target.value,
+                                )
+                              }
+                              inputProps={decimalInputProps}
+                            />
+
+                            <Typography fontWeight={800}>
+                              {formatCurrency(
+                                detail.quantity *
+                                  detail.unitPrice,
+                              )}
+                            </Typography>
+
+                            <IconButton
+                              color="error"
+                              onClick={() =>
+                                removeDetail(
+                                  detail.productId,
+                                )
+                              }
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Box>
+
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: {
+                                xs: '1fr',
+                                sm: 'repeat(2, 1fr)',
+                                md: 'repeat(5, 1fr)',
+                              },
+                              gap: 1,
+                              mt: 1.5,
+                            }}
+                          >
+                            {(
+                              [
+                                [
+                                  'priceNormal',
+                                  'P. Normal',
+                                ],
+                                [
+                                  'priceCamino',
+                                  'P. Camino',
+                                ],
+                                [
+                                  'priceEspecial',
+                                  'P. Especial',
+                                ],
+                                [
+                                  'priceMayorista',
+                                  'P. Mayorista',
+                                ],
+                                [
+                                  'minQuantityWholesale',
+                                  'Cant. mín. mayorista',
+                                ],
+                              ] as const
+                            ).map(([field, label]) => (
+                              <TextField
+                                key={field}
+                                size="small"
+                                type="number"
+                                label={label}
+                                value={detail[field] ?? ''}
+                                onChange={(event) =>
+                                  updateSalePrice(
+                                    detail.productId,
+                                    field,
+                                    event.target.value,
+                                  )
+                                }
+                                inputProps={
+                                  field ===
+                                  'minQuantityWholesale'
+                                    ? {
+                                        min: 1,
+                                        step: 1,
+                                        inputMode:
+                                          'numeric',
+                                      }
+                                    : decimalInputProps
+                                }
+                              />
+                            ))}
+                          </Box>
+
+                          <Box
+                            sx={{
+                              mt: 1.5,
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            <Stack
+                              direction={{
+                                xs: 'column',
+                                sm: 'row',
+                              }}
+                              justifyContent="space-between"
+                              spacing={0.5}
+                              sx={{ mb: 1 }}
+                            >
+                              <Typography fontWeight={800}>
+                                Distribución por almacén
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                fontWeight={800}
+                                color={
+                                  distributionMatches
+                                    ? 'success.main'
+                                    : 'error.main'
+                                }
+                              >
+                                Asignado:{' '}
+                                {distributedQuantity} de{' '}
+                                {detail.quantity}
+                              </Typography>
+                            </Stack>
+
+                            <Box
                               sx={{
-                                p: 1.5,
+                                display: 'grid',
+                                gridTemplateColumns: {
+                                  xs: '1fr',
+                                  sm: 'repeat(2, 1fr)',
+                                  md: `repeat(${Math.max(
+                                    1,
+                                    Math.min(
+                                      activeWarehouses.length,
+                                      4,
+                                    ),
+                                  )}, 1fr)`,
+                                },
+                                gap: 1,
                               }}
                             >
-                              <Box
-                                sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: {
-                                    xs: '1fr',
-                                    md: '2fr 1fr 1fr 1fr auto',
-                                  },
-                                  gap: 1,
-                                  alignItems: 'center',
-                                }}
-                              >
-                                <Typography fontWeight={700}>
-                                  {product?.name ||
-                                    detail.productId}
-                                </Typography>
-
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  label="Cantidad"
-                                  value={detail.quantity}
-                                  onChange={(event) =>
-                                    updateDetail(
-                                      detail.productId,
-                                      'quantity',
-                                      event.target.value,
-                                    )
-                                  }
-                                  inputProps={decimalInputProps}
-                                />
-
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  label="P. compra"
-                                  value={detail.unitPrice}
-                                  onChange={(event) =>
-                                    updateDetail(
-                                      detail.productId,
-                                      'unitPrice',
-                                      event.target.value,
-                                    )
-                                  }
-                                  inputProps={decimalInputProps}
-                                />
-
-                                <Typography fontWeight={800}>
-                                  {formatCurrency(
-                                    detail.quantity *
-                                      detail.unitPrice,
-                                  )}
-                                </Typography>
-
-                                <IconButton
-                                  color="error"
-                                  onClick={() =>
-                                    removeDetail(
-                                      detail.productId,
-                                    )
-                                  }
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </Box>
-
-                              <Box
-                                sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: {
-                                    xs: '1fr',
-                                    sm: 'repeat(2, 1fr)',
-                                    md: 'repeat(5, 1fr)',
-                                  },
-                                  gap: 1,
-                                  mt: 1.5,
-                                }}
-                              >
-                                {(
-                                  [
-                                    ['priceNormal', 'P. Normal'],
-                                    ['priceCamino', 'P. Camino'],
-                                    ['priceEspecial', 'P. Especial'],
-                                    ['priceMayorista', 'P. Mayorista'],
-                                    [
-                                      'minQuantityWholesale',
-                                      'Cant. mín. mayorista',
-                                    ],
-                                  ] as const
-                                ).map(([field, label]) => (
+                              {activeWarehouses.map(
+                                (warehouse) => (
                                   <TextField
-                                    key={field}
+                                    key={warehouse.id}
                                     size="small"
                                     type="number"
-                                    label={label}
-                                    value={detail[field] ?? ''}
+                                    label={`${warehouse.name}${
+                                      warehouse.isDefault
+                                        ? ' (predeterminado)'
+                                        : ''
+                                    }`}
+                                    value={
+                                      detail.warehouseDistributions.find(
+                                        (distribution) =>
+                                          distribution.warehouseId ===
+                                          warehouse.id,
+                                      )?.quantity ?? ''
+                                    }
                                     onChange={(event) =>
-                                      updateSalePrice(
+                                      updateWarehouseDistribution(
                                         detail.productId,
-                                        field,
+                                        warehouse.id,
                                         event.target.value,
                                       )
                                     }
                                     inputProps={
-                                      field ===
-                                      'minQuantityWholesale'
-                                        ? {
-                                            min: 1,
-                                            step: 1,
-                                            inputMode: 'numeric',
-                                          }
-                                        : decimalInputProps
+                                      decimalInputProps
                                     }
+                                    error={
+                                      !distributionMatches
+                                    }
+                                    disabled={loading}
                                   />
-                                ))}
-                              </Box>
-                            </Paper>
-                          );
-                        },
-                      )}
-                    </Stack>
-                  </Box>
-                ))}
-              </Paper>
-            ),
-          )}
+                                ),
+                              )}
+                            </Box>
+
+                            {!distributionMatches && (
+                              <Typography
+                                variant="caption"
+                                color="error.main"
+                                sx={{
+                                  display: 'block',
+                                  mt: 0.75,
+                                }}
+                              >
+                                La suma debe ser exactamente
+                                igual a la cantidad
+                                comprada.
+                              </Typography>
+                            )}
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              ))}
+            </Paper>
+          ))}
         </Stack>
 
         {details.length === 0 && (
-          <Alert
-            severity="info"
-            sx={{ mt: 2 }}
-          >
+          <Alert severity="info" sx={{ mt: 2 }}>
             Todavía no agregaste productos.
           </Alert>
         )}
@@ -1436,30 +1611,21 @@ export function PurchaseFormDialog({
             textAlign: 'right',
           }}
         >
-          <Typography
-            variant="h5"
-            fontWeight={900}
-          >
-            Total general:{' '}
-            {formatCurrency(generalTotal)}
+          <Typography variant="h5" fontWeight={900}>
+            Total general: {formatCurrency(generalTotal)}
           </Typography>
         </Box>
       </DialogContent>
 
       <DialogActions sx={{ p: 2 }}>
-        <Button
-          onClick={onClose}
-          disabled={loading}
-        >
+        <Button onClick={onClose} disabled={loading}>
           Cancelar
         </Button>
 
         <Button
           variant="contained"
           onClick={submitForm}
-          disabled={
-            loading || details.length === 0
-          }
+          disabled={loading || details.length === 0}
         >
           {loading
             ? 'Guardando...'
