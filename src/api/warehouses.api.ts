@@ -9,3 +9,13 @@ export async function getWarehouses(): Promise<
 
   return Array.isArray(response.data) ? response.data : [];
 }
+
+export async function getWarehouse(
+  id: string,
+): Promise<Warehouse> {
+  const response = await api.get<Warehouse>(
+    `/warehouses/${id}`,
+  );
+
+  return response.data;
+}
