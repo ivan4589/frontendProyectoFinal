@@ -12,6 +12,7 @@ import { ProvidersPage } from '../features/providers/ProvidersPage';
 import { ProductsPage } from '../features/products/ProductsPage';
 import { PurchasesPage } from '../features/purchases/PurchasesPage';
 import { SalesPage } from '../features/sales/SalesPage';
+import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
 
 function RequireAuth({
@@ -116,6 +117,11 @@ export function AppRouter() {
         <Route
           path="sales"
           element={<SalesPage />}
+        />
+
+        <Route
+          path="collections"
+          element={<CollectionsPage />}
         />
 
         <Route
