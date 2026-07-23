@@ -14,6 +14,7 @@ import { PurchasesPage } from '../features/purchases/PurchasesPage';
 import { SalesPage } from '../features/sales/SalesPage';
 import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
+import { WarehouseTransfersPage } from '../features/warehouse-transfers/WarehouseTransfersPage';
 
 function RequireAuth({
   children,
@@ -37,6 +38,20 @@ function PublicOnly({
   const { isAuthenticated } = useAuth();
 
   if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function RequireAdmin({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const { user } = useAuth();
+
+  if (user?.role !== 'ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -112,6 +127,15 @@ export function AppRouter() {
         <Route
           path="purchases"
           element={<PurchasesPage />}
+        />
+
+        <Route
+          path="warehouse-transfers"
+          element={
+            <RequireAdmin>
+              <WarehouseTransfersPage />
+            </RequireAdmin>
+          }
         />
 
         <Route
