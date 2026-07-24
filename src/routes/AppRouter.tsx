@@ -15,6 +15,7 @@ import { SalesPage } from '../features/sales/SalesPage';
 import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { WarehouseTransfersPage } from '../features/warehouse-transfers/WarehouseTransfersPage';
+import { InventoryPage } from '../features/inventory/InventoryPage';
 
 function RequireAuth({
   children,
@@ -122,6 +123,11 @@ export function AppRouter() {
         <Route
           path="products"
           element={<ProductsPage />}
+        />
+
+        <Route
+          path="inventory"
+          element={<InventoryPage />}
         />
 
         <Route
