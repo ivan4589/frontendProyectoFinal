@@ -16,6 +16,7 @@ import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { WarehouseTransfersPage } from '../features/warehouse-transfers/WarehouseTransfersPage';
 import { InventoryPage } from '../features/inventory/InventoryPage';
+import { ReportsPage } from '../features/reports/ReportsPage';
 
 function RequireAuth({
   children,
@@ -57,22 +58,6 @@ function RequireAdmin({
   }
 
   return <>{children}</>;
-}
-
-function PlaceholderPage({
-  title,
-}: {
-  title: string;
-}) {
-  return (
-    <div>
-      <h1>{title}</h1>
-
-      <p>
-        Este módulo será implementado después.
-      </p>
-    </div>
-  );
 }
 
 export function AppRouter() {
@@ -156,9 +141,7 @@ export function AppRouter() {
 
         <Route
           path="reports"
-          element={
-            <PlaceholderPage title="Reportes" />
-          }
+          element={<ReportsPage />}
         />
 
         <Route
