@@ -22,6 +22,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
@@ -47,6 +48,11 @@ const menuItems = [
     text: 'Productos',
     path: '/products',
     icon: <InventoryIcon />,
+  },
+  {
+    text: 'Inventario',
+    path: '/inventory',
+    icon: <Inventory2Icon />,
   },
   {
     text: 'Compras',

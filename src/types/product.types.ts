@@ -45,6 +45,9 @@ export interface Product {
   minQuantityWholesale?: number | null;
   stock: number;
   reservedStock?: number;
+  centralStock?: number;
+  centralReservedStock?: number;
+  centralAvailableStock?: number;
   minStock: number;
   unit: string;
   reserveQuantity?: number | null;

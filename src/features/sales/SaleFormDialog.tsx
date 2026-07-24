@@ -172,6 +172,20 @@ function getAvailableStock(
   product: Product,
   previousQuantity = 0,
 ) {
+  if (
+    product.centralStock !== undefined ||
+    product.centralReservedStock !==
+      undefined
+  ) {
+    return (
+      Number(product.centralStock || 0) -
+      Number(
+        product.centralReservedStock || 0,
+      ) +
+      previousQuantity
+    );
+  }
+
   return (
     Number(product.stock || 0) -
     Number(product.reservedStock || 0) +
