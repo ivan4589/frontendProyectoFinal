@@ -23,6 +23,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
@@ -79,6 +80,12 @@ const menuItems = [
     text: 'Reportes',
     path: '/reports',
     icon: <AssessmentIcon />,
+  },
+  {
+    text: 'Administración',
+    path: '/administration',
+    icon: <AdminPanelSettingsIcon />,
+    adminOnly: true,
   },
 ];
 
@@ -164,7 +171,7 @@ export function MainLayout() {
             }}
           />
 
-          <Typography variant="subtitle1" fontWeight={700}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
             Yungas Distribuidora
           </Typography>
 
