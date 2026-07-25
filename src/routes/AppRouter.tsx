@@ -17,6 +17,7 @@ import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { WarehouseTransfersPage } from '../features/warehouse-transfers/WarehouseTransfersPage';
 import { InventoryPage } from '../features/inventory/InventoryPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
+import { AdministrationPage } from '../features/administration/AdministrationPage';
 
 function RequireAuth({
   children,
@@ -142,6 +143,15 @@ export function AppRouter() {
         <Route
           path="reports"
           element={<ReportsPage />}
+        />
+
+        <Route
+          path="administration"
+          element={
+            <RequireAdmin>
+              <AdministrationPage />
+            </RequireAdmin>
+          }
         />
 
         <Route
