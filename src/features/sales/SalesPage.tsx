@@ -35,6 +35,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SearchIcon from '@mui/icons-material/Search';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 import {
   Fragment,
@@ -59,6 +60,7 @@ import {
   createSale,
   createSaleReturn,
   getSales,
+  sendSaleWhatsApp,
   updateSale,
 } from '../../api/sales.api';
 
@@ -336,6 +338,9 @@ export function SalesPage() {
   const [actionError, setActionError] =
     useState<string | null>(null);
 
+  const [actionSuccess, setActionSuccess] =
+    useState<string | null>(null);
+
   const {
     data: sales = [],
     isLoading: salesLoading,
@@ -610,6 +615,35 @@ export function SalesPage() {
       ),
   });
 
+  const whatsAppMutation = useMutation({
+    mutationFn: ({
+      saleId,
+      resend,
+    }: {
+      saleId: string;
+      resend: boolean;
+    }) =>
+      sendSaleWhatsApp(
+        saleId,
+        resend,
+      ),
+
+    onSuccess: async (result) => {
+      await refreshSales();
+      setActionError(null);
+      setActionSuccess(
+        `Nota de venta enviada por WhatsApp a ${result.phoneNumber}.`,
+      );
+    },
+
+    onError: (mutationError) => {
+      setActionSuccess(null);
+      setActionError(
+        getErrorMessage(mutationError),
+      );
+    },
+  });
+
   const handleCreateSale = () => {
     setSelectedSale(null);
     setFormError(null);
@@ -690,6 +724,30 @@ export function SalesPage() {
     setReturnOpen(true);
   };
 
+  const handleSendWhatsApp = (
+    sale: Sale,
+  ) => {
+    const resend = Boolean(
+      sale.whatsappLastSentAt,
+    );
+
+    if (
+      resend &&
+      !window.confirm(
+        `La nota ${sale.saleNumber} ya fue enviada. ¿Deseas reenviarla?`,
+      )
+    ) {
+      return;
+    }
+
+    setActionError(null);
+    setActionSuccess(null);
+    whatsAppMutation.mutate({
+      saleId: sale.id,
+      resend,
+    });
+  };
+
   const hasFilters =
     Boolean(search) ||
     statusFilter !== 'ALL' ||
@@ -713,7 +771,8 @@ export function SalesPage() {
 
   const actionLoading =
     confirmMutation.isPending ||
-    cancelMutation.isPending;
+    cancelMutation.isPending ||
+    whatsAppMutation.isPending;
 
   if (
     salesLoading ||
@@ -945,6 +1004,18 @@ export function SalesPage() {
           sx={{ mb: 2 }}
         >
           {actionError}
+        </Alert>
+      )}
+
+      {actionSuccess && (
+        <Alert
+          severity="success"
+          onClose={() =>
+            setActionSuccess(null)
+          }
+          sx={{ mb: 2 }}
+        >
+          {actionSuccess}
         </Alert>
       )}
 
@@ -1232,6 +1303,20 @@ export function SalesPage() {
                       ? sale.cancelledPdfUrl
                       : sale.pdfUrl;
 
+                  const whatsappDisabledReason =
+                    !sale.clientPhone
+                      ? 'El cliente no tiene teléfono'
+                      : !sale.clientWhatsAppConsent
+                        ? 'El cliente no autorizó envíos por WhatsApp'
+                        : !sale.pdfUrl
+                          ? 'La venta no tiene un PDF disponible'
+                          : null;
+
+                  const sendingThisSale =
+                    whatsAppMutation.isPending &&
+                    whatsAppMutation.variables
+                      ?.saleId === sale.id;
+
                   return (
                     <Fragment key={sale.id}>
                       <TableRow hover>
@@ -1435,6 +1520,52 @@ export function SalesPage() {
                                 >
                                   <ReplayIcon fontSize="small" />
                                 </IconButton>
+                              </Tooltip>
+                            )}
+
+                          {canManageSales &&
+                            sale.status ===
+                              'CONFIRMED' && (
+                              <Tooltip
+                                title={
+                                  whatsappDisabledReason ||
+                                  (sale.whatsappLastSentAt
+                                    ? 'Reenviar nota por WhatsApp'
+                                    : 'Enviar nota por WhatsApp')
+                                }
+                              >
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    disabled={
+                                      Boolean(
+                                        whatsappDisabledReason,
+                                      ) ||
+                                      actionLoading
+                                    }
+                                    onClick={() =>
+                                      handleSendWhatsApp(
+                                        sale,
+                                      )
+                                    }
+                                    aria-label={
+                                      sale.whatsappLastSentAt
+                                        ? 'Reenviar nota por WhatsApp'
+                                        : 'Enviar nota por WhatsApp'
+                                    }
+                                  >
+                                    <WhatsAppIcon
+                                      fontSize="small"
+                                      sx={{
+                                        opacity:
+                                          sendingThisSale
+                                            ? 0.45
+                                            : 1,
+                                      }}
+                                    />
+                                  </IconButton>
+                                </span>
                               </Tooltip>
                             )}
 
