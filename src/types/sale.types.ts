@@ -41,6 +41,7 @@ export interface Sale {
   clientType: ClientType;
   clientLocation?: string | null;
   clientPhone?: string | null;
+  clientWhatsAppConsent: boolean;
 
   userId: number;
   userName: string;
@@ -60,6 +61,9 @@ export interface Sale {
   observations?: string | null;
   pdfUrl?: string | null;
   cancelledPdfUrl?: string | null;
+  whatsappLastSentAt?: string | null;
+  whatsappMessageId?: string | null;
+  whatsappLastError?: string | null;
 
   details: SaleDetail[];
 
@@ -115,4 +119,12 @@ export interface SaleReturnResponse {
     createdAt: string;
   };
   sale: Sale;
+}
+
+export interface SendSaleWhatsAppResponse {
+  saleId: string;
+  status: 'SENT';
+  phoneNumber: string;
+  messageId: string;
+  sentAt: string;
 }

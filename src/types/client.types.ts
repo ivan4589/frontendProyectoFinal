@@ -19,6 +19,7 @@ export interface Client {
   locationId: string;
   location?: Location;
   phone?: string | null;
+  whatsappConsent: boolean;
   additionalInfo?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -36,6 +37,7 @@ export interface CreateClientRequest {
   type: ClientType;
   locationId: string;
   phone?: string;
+  whatsappConsent?: boolean;
   additionalInfo?: string;
 }
 
@@ -45,6 +47,7 @@ export interface UpdateClientRequest {
   type?: ClientType;
   locationId?: string;
   phone?: string;
+  whatsappConsent?: boolean;
   additionalInfo?: string;
 }
 

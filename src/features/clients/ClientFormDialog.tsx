@@ -2,10 +2,12 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   TextField,
 } from '@mui/material';
@@ -34,6 +36,7 @@ interface ClientFormValues {
   type: ClientType;
   locationId: string;
   phone: string;
+  whatsappConsent: boolean;
   additionalInfo: string;
 }
 
@@ -66,6 +69,7 @@ export function ClientFormDialog({
       type: 'NORMAL',
       locationId: '',
       phone: '',
+      whatsappConsent: false,
       additionalInfo: '',
     },
   });
@@ -78,6 +82,8 @@ export function ClientFormDialog({
         type: client?.type || 'NORMAL',
         locationId: client?.locationId || '',
         phone: client?.phone || '',
+        whatsappConsent:
+          client?.whatsappConsent ?? false,
         additionalInfo: client?.additionalInfo || '',
       });
 
@@ -99,6 +105,8 @@ export function ClientFormDialog({
       type: values.type,
       locationId: values.locationId,
       phone: values.phone.trim() || undefined,
+      whatsappConsent:
+        values.whatsappConsent,
       additionalInfo: values.additionalInfo.trim() || undefined,
     };
 
@@ -184,6 +192,21 @@ export function ClientFormDialog({
             placeholder="Ej: +591 71234567"
             margin="normal"
             {...register('phone')}
+          />
+
+          <FormControlLabel
+            sx={{
+              mt: 1,
+              alignItems: 'flex-start',
+            }}
+            control={
+              <Checkbox
+                {...register(
+                  'whatsappConsent',
+                )}
+              />
+            }
+            label="Autoriza el envío de documentos por WhatsApp"
           />
 
           <TextField

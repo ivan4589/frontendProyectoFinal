@@ -6,6 +6,7 @@ import type {
   Sale,
   SaleReturnResponse,
   SaleStatus,
+  SendSaleWhatsAppResponse,
   UpdateSaleRequest,
 } from '../types/sale.types';
 
@@ -128,6 +129,21 @@ export async function createSaleReturn(
     await api.post<SaleReturnResponse>(
       `/sales/${saleId}/returns`,
       data,
+    );
+
+  return response.data;
+}
+
+export async function sendSaleWhatsApp(
+  saleId: string,
+  resend = false,
+): Promise<SendSaleWhatsAppResponse> {
+  const response =
+    await api.post<SendSaleWhatsAppResponse>(
+      `/sales/${saleId}/whatsapp`,
+      {
+        resend,
+      },
     );
 
   return response.data;
