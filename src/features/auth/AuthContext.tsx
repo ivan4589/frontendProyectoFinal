@@ -7,7 +7,11 @@ import {
   type ReactNode,
 } from 'react';
 import { loginRequest } from '../../api/auth.api';
-import type { AuthUser, LoginRequest } from '../../types/auth.types';
+import type {
+  AuthUser,
+  LoginRequest,
+  LoginResponse,
+} from '../../types/auth.types';
 import {
   clearToken,
   decodeToken,
@@ -20,7 +24,8 @@ interface AuthContextValue {
   token: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: (data: LoginRequest, remember: boolean) => Promise<void>;
+  login: (data: LoginRequest, remember: boolean) => Promise<LoginResponse>;
+  completeLogin: (response: LoginResponse, remember: boolean) => void;
   logout: () => void;
 }
 
@@ -28,30 +33,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function getInitialToken() {
   const token = getToken();
-
-  if (!token) {
-    return null;
-  }
-
+  if (!token) return null;
   if (isTokenExpired(token)) {
     clearToken();
     return null;
   }
-
   return token;
 }
 
 function getUserFromToken(token: string | null): AuthUser | null {
-  if (!token) {
-    return null;
-  }
-
+  if (!token) return null;
   const decoded = decodeToken(token);
-
-  if (!decoded) {
-    return null;
-  }
-
+  if (!decoded) return null;
   return {
     id: decoded.id || decoded.sub,
     name: decoded.name,
@@ -60,30 +53,34 @@ function getUserFromToken(token: string | null): AuthUser | null {
   };
 }
 
+function responseToken(response: LoginResponse) {
+  return response.access_token || response.accessToken || response.token;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => getInitialToken());
-
   const user = useMemo(() => getUserFromToken(token), [token]);
 
-  const login = useCallback(async (data: LoginRequest, remember: boolean) => {
-    const response = await loginRequest(data);
+  const completeLogin = useCallback(
+    (response: LoginResponse, remember: boolean) => {
+      const receivedToken = responseToken(response);
+      if (!receivedToken || !decodeToken(receivedToken)) {
+        throw new Error('El servidor no devolvió una sesión válida');
+      }
+      saveToken(receivedToken, remember);
+      setToken(receivedToken);
+    },
+    [],
+  );
 
-    const receivedToken =
-      response.access_token || response.accessToken || response.token;
-
-    if (!receivedToken) {
-      throw new Error('El servidor no devolvió un token válido');
-    }
-
-    const decoded = decodeToken(receivedToken);
-
-    if (!decoded) {
-      throw new Error('El token recibido no es válido');
-    }
-
-    saveToken(receivedToken, remember);
-    setToken(receivedToken);
-  }, []);
+  const login = useCallback(
+    async (data: LoginRequest, remember: boolean) => {
+      const response = await loginRequest(data);
+      if (responseToken(response)) completeLogin(response, remember);
+      return response;
+    },
+    [completeLogin],
+  );
 
   const logout = useCallback(() => {
     clearToken();
@@ -96,9 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: Boolean(token),
       login,
+      completeLogin,
       logout,
     }),
-    [token, user, login, logout],
+    [token, user, login, completeLogin, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -106,10 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error('useAuth debe usarse dentro de AuthProvider');
-  }
-
+  if (!context) throw new Error('useAuth debe usarse dentro de AuthProvider');
   return context;
 }
