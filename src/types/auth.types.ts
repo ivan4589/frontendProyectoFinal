@@ -5,26 +5,53 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse {
-  access_token?: string;
-  accessToken?: string;
-  token?: string;
-  user?: AuthUser;
-}
-
 export interface AuthUser {
   id?: number;
   name?: string;
   email?: string;
   role?: UserRole;
+  status?: string;
+  twoFactorEnabled?: boolean;
+}
+
+export interface LoginResponse {
+  access_token?: string;
+  accessToken?: string;
+  token?: string;
+  user?: AuthUser;
+  requiresTwoFactor?: boolean;
+  requiresTwoFactorSetup?: boolean;
+  challengeToken?: string;
+  recoveryCodes?: string[];
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  phone?: string;
+  requestedRole: 'VENDEDOR' | 'COBRADOR';
+  password: string;
+}
+
+export interface RegistrationRequest {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  requestedRole: 'VENDEDOR' | 'COBRADOR';
+  status: 'PENDING_EMAIL_VERIFICATION' | 'PENDING_ADMIN_APPROVAL';
+  emailVerifiedAt?: string | null;
+  createdAt: string;
 }
 
 export interface DecodedToken {
   sub?: number;
   id?: number;
+  sid?: string;
   email?: string;
   name?: string;
   role?: UserRole;
+  securityVersion?: number;
   exp?: number;
   iat?: number;
 }
