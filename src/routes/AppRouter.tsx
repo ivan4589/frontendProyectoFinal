@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { AdministrationPage } from '../features/administration/AdministrationPage';
+import { RegistrationRequestsPage } from '../features/administration/RegistrationRequestsPage';
 import {
   ForgotPasswordPage,
   RegisterPage,
@@ -61,6 +62,7 @@ export function AppRouter() {
         <Route path="collections" element={<CollectionsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="administration" element={<RequireAdmin><AdministrationPage /></RequireAdmin>} />
+        <Route path="administration/registration-requests" element={<RequireAdmin><RegistrationRequestsPage /></RequireAdmin>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
