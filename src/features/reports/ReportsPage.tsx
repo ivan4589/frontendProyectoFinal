@@ -32,6 +32,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   generateAnalyticsReportPdf,
+  generateSalesMatrixPdf,
   getAnalyticsReport,
   getReportCatalog,
 } from "../../api/reports.api";
@@ -209,6 +210,11 @@ export function ReportsPage() {
     onSuccess: (result) => openPdf(result.pdfUrl),
   });
 
+  const matrixPdfMutation = useMutation({
+    mutationFn: () => generateSalesMatrixPdf(requestFilters),
+    onSuccess: (result) => openPdf(result.pdfUrl),
+  });
+
   if (catalogQuery.isLoading) {
     return <Loading message="Preparando los reportes..." />;
   }
@@ -253,18 +259,37 @@ export function ReportsPage() {
           </Box>
         </Stack>
 
-        <Button
-          variant="contained"
-          startIcon={<DownloadIcon />}
-          disabled={!activeKey || !reportQuery.data || pdfMutation.isPending}
-          onClick={() => pdfMutation.mutate()}
-        >
-          {pdfMutation.isPending ? "Generando PDF..." : "Generar PDF"}
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          {activeKey === "sales-detail" && (
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              disabled={!reportQuery.data || matrixPdfMutation.isPending}
+              onClick={() => matrixPdfMutation.mutate()}
+            >
+              {matrixPdfMutation.isPending
+                ? "Generando matriz..."
+                : "Reporte Matriz"}
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            disabled={!activeKey || !reportQuery.data || pdfMutation.isPending}
+            onClick={() => pdfMutation.mutate()}
+          >
+            {pdfMutation.isPending ? "Generando PDF..." : "Generar PDF"}
+          </Button>
+        </Stack>
       </Stack>
 
       {pdfMutation.isError && (
         <Alert severity="error">{getErrorMessage(pdfMutation.error)}</Alert>
+      )}
+      {matrixPdfMutation.isError && (
+        <Alert severity="error">
+          {getErrorMessage(matrixPdfMutation.error)}
+        </Alert>
       )}
 
       <Stack spacing={2}>
