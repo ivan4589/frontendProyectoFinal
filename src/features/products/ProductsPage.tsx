@@ -97,14 +97,7 @@ function getErrorMessage(error: unknown) {
 
   return 'Ocurrió un error inesperado.';
 }
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
-    .join("");
-}
+
 
 function getCategoryName(product: Product, categories: Category[]) {
   if (product.category?.name) return product.category.name;

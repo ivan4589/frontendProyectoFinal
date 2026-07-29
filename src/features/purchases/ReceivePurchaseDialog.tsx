@@ -12,12 +12,12 @@ import {
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import type { Purchase } from '../../types/purchase.types';
+import type { PurchaseProviderGroup } from '../../types/purchase.types';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface ReceivePurchaseDialogProps {
   open: boolean;
-  purchase?: Purchase | null;
+  purchase?: PurchaseProviderGroup | null;
   loading?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -41,7 +41,12 @@ export function ReceivePurchaseDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={loading ? undefined : onClose}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle>Recibir compra</DialogTitle>
 
       <DialogContent dividers>
@@ -52,15 +57,17 @@ export function ReceivePurchaseDialog({
         )}
 
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Al recibir la compra se aumentará el stock de los productos. Esta acción
-          solo debería hacerse cuando la mercadería ya ingresó al almacén.
+          Al recibir la compra se aumentará el stock de los productos. Esta
+          acción solo debería realizarse cuando la mercadería ya ingresó al
+          almacén.
         </Alert>
 
         {purchase && (
           <Box sx={{ mb: 2 }}>
-            <Typography fontWeight={800}>
-              Proveedor: {purchase.providerName || purchase.provider?.companyName || '-'}
+            <Typography sx={{ fontWeight: 800 }}>
+              Proveedor: {purchase.providerName || '-'}
             </Typography>
+
             <Typography color="text.secondary">
               Total: {formatCurrency(purchase.total)}
             </Typography>
@@ -68,7 +75,7 @@ export function ReceivePurchaseDialog({
         )}
 
         <Stack spacing={1}>
-          {purchase?.details.map((detail) => (
+          {(purchase?.details ?? []).map((detail) => (
             <Box
               key={detail.id || detail.productId}
               sx={{
@@ -77,9 +84,10 @@ export function ReceivePurchaseDialog({
                 p: 1.5,
               }}
             >
-              <Typography fontWeight={800}>
-                {detail.productName || detail.product?.name || detail.productId}
+              <Typography sx={{ fontWeight: 800 }}>
+                {detail.productName || detail.productId}
               </Typography>
+
               <Typography variant="body2" color="text.secondary">
                 Cantidad: {detail.quantity} | Precio compra:{' '}
                 {formatCurrency(detail.unitPrice)} | Subtotal:{' '}
@@ -111,7 +119,7 @@ export function ReceivePurchaseDialog({
           variant="contained"
           color="success"
           onClick={() => onConfirm(updatePrices)}
-          disabled={loading}
+          disabled={loading || !purchase}
         >
           {loading ? 'Recibiendo...' : 'Confirmar recepción'}
         </Button>
