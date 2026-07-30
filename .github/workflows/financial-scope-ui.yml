@@ -1,0 +1,91 @@
+name: Financial Scope UI
+
+on:
+  push:
+    branches:
+      - agent/roles-permisos-alcance-datos
+    paths:
+      - '.github/workflows/financial-scope-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/roles-permisos-alcance-datos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply financial scope UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/features/sales/SalesPage.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old: str, new: str):
+              global text
+              if old not in text:
+                  raise SystemExit(f'No se encontró el bloque esperado: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              """  const canManageOwnSale = (sale: Sale) =>\n    isAdmin ||\n    (user?.role === 'VENDEDOR' && sale.userId === user?.id);""",
+              """  const canManageOwnSale = (sale: Sale) =>\n    isAdmin ||\n    (user?.role === 'VENDEDOR' && sale.userId === user?.id);\n  const canViewSaleFinancials = (sale: Sale) =>\n    isAdmin ||\n    user?.role === 'COBRADOR' ||\n    sale.userId === user?.id;""",
+          )
+          replace_once(
+              """                  const paymentStyle =\n                    getPaymentStatusStyle(\n                      sale.paymentStatus,\n                    );""",
+              """                  const canViewFinancials =\n                    canViewSaleFinancials(sale);\n\n                  const paymentStyle = canViewFinancials\n                    ? getPaymentStatusStyle(sale.paymentStatus)\n                    : null;""",
+          )
+          replace_once(
+              """                        <TableCell>\n                          <Chip\n                            size=\"small\"\n                            label={getPaymentStatusLabel(\n                              sale.paymentStatus,\n                            )}\n                            sx={{\n                              bgcolor:\n                                paymentStyle.backgroundColor,\n                              color:\n                                paymentStyle.color,\n                              fontWeight: 800,\n                            }}\n                          />\n                        </TableCell>""",
+              """                        <TableCell>\n                          {canViewFinancials && paymentStyle ? (\n                            <Chip\n                              size=\"small\"\n                              label={getPaymentStatusLabel(sale.paymentStatus)}\n                              sx={{\n                                bgcolor: paymentStyle.backgroundColor,\n                                color: paymentStyle.color,\n                                fontWeight: 800,\n                              }}\n                            />\n                          ) : (\n                            <Chip\n                              size=\"small\"\n                              label=\"Restringido\"\n                              variant=\"outlined\"\n                            />\n                          )}\n                        </TableCell>""",
+          )
+          replace_once(
+              """                          {sale.balance > 0 && (""",
+              """                          {canViewFinancials && sale.balance > 0 && (""",
+          )
+          paid_block = """                                <Paper\n                                  variant=\"outlined\"\n                                  sx={{ p: 1.5 }}\n                                >\n                                  <Typography variant=\"caption\">\n                                    Pagado\n                                  </Typography>\n\n                                  <Typography\n                                    fontWeight={800}\n                                    color=\"success.main\"\n                                  >\n                                    {formatCurrency(\n                                      sale.paidAmount,\n                                    )}\n                                  </Typography>\n                                </Paper>"""
+          replace_once(
+              paid_block,
+              """                                {canViewFinancials && (\n                                  <Paper\n                                    variant=\"outlined\"\n                                    sx={{ p: 1.5 }}\n                                  >\n                                    <Typography variant=\"caption\">\n                                      Pagado\n                                    </Typography>\n                                    <Typography fontWeight={800} color=\"success.main\">\n                                      {formatCurrency(sale.paidAmount)}\n                                    </Typography>\n                                  </Paper>\n                                )}""",
+          )
+          balance_block = """                                <Paper\n                                  variant=\"outlined\"\n                                  sx={{ p: 1.5 }}\n                                >\n                                  <Typography variant=\"caption\">\n                                    Saldo\n                                  </Typography>\n\n                                  <Typography\n                                    fontWeight={800}\n                                    color={\n                                      sale.balance >\n                                      0\n                                        ? 'error.main'\n                                        : 'success.main'\n                                    }\n                                  >\n                                    {formatCurrency(\n                                      sale.balance,\n                                    )}\n                                  </Typography>\n                                </Paper>"""
+          replace_once(
+              balance_block,
+              """                                {canViewFinancials && (\n                                  <Paper\n                                    variant=\"outlined\"\n                                    sx={{ p: 1.5 }}\n                                  >\n                                    <Typography variant=\"caption\">\n                                      Saldo\n                                    </Typography>\n                                    <Typography\n                                      fontWeight={800}\n                                      color={sale.balance > 0 ? 'error.main' : 'success.main'}\n                                    >\n                                      {formatCurrency(sale.balance)}\n                                    </Typography>\n                                  </Paper>\n                                )}""",
+          )
+          replace_once(
+              """      {user?.role === 'COBRADOR' && (""",
+              """      {user?.role === 'VENDEDOR' && (\n        <Alert severity=\"info\" sx={{ mb: 2 }}>\n          Puedes consultar y descargar todas las ventas. Los saldos y pagos\n          solo se muestran en las ventas registradas por tu usuario.\n        </Alert>\n      )}\n\n      {user?.role === 'COBRADOR' && (""",
+          )
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Install and build
+        id: build
+        continue-on-error: true
+        run: |
+          npm ci
+          npm run build
+      - name: Record and commit
+        shell: bash
+        run: |
+          {
+            echo "RBAC_UI_FINANCIAL_BUILD_OUTCOME=${{ steps.build.outcome }}"
+            echo "Validated at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > .github/rbac-ui-financial-validation.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src .github/rbac-ui-financial-validation.txt
+          git commit -m "Oculta saldos ajenos en la interfaz de ventas"
+          git push origin HEAD:agent/roles-permisos-alcance-datos
+          test "${{ steps.build.outcome }}" = "success"
