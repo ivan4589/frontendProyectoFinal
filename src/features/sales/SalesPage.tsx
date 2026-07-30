@@ -293,6 +293,10 @@ export function SalesPage() {
   const canManageOwnSale = (sale: Sale) =>
     isAdmin ||
     (user?.role === 'VENDEDOR' && sale.userId === user?.id);
+  const canViewSaleFinancials = (sale: Sale) =>
+    isAdmin ||
+    user?.role === 'COBRADOR' ||
+    sale.userId === user?.id;
 
   const [search, setSearch] =
     useState('');
@@ -992,6 +996,13 @@ export function SalesPage() {
         </Card>
       </Box>
 
+      {user?.role === 'VENDEDOR' && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Puedes consultar y descargar todas las ventas. Los saldos y pagos
+          solo se muestran en las ventas registradas por tu usuario.
+        </Alert>
+      )}
+
       {user?.role === 'COBRADOR' && (
         <Alert
           severity="info"
@@ -1298,10 +1309,12 @@ export function SalesPage() {
                       sale.status,
                     );
 
-                  const paymentStyle =
-                    getPaymentStatusStyle(
-                      sale.paymentStatus,
-                    );
+                  const canViewFinancials =
+                    canViewSaleFinancials(sale);
+
+                  const paymentStyle = canViewFinancials
+                    ? getPaymentStatusStyle(sale.paymentStatus)
+                    : null;
 
                   const documentUrl = canDownloadAllSales
                     ? sale.status === 'CANCELLED' && sale.cancelledPdfUrl
@@ -1416,19 +1429,23 @@ export function SalesPage() {
                         </TableCell>
 
                         <TableCell>
-                          <Chip
-                            size="small"
-                            label={getPaymentStatusLabel(
-                              sale.paymentStatus,
-                            )}
-                            sx={{
-                              bgcolor:
-                                paymentStyle.backgroundColor,
-                              color:
-                                paymentStyle.color,
-                              fontWeight: 800,
-                            }}
-                          />
+                          {canViewFinancials && paymentStyle ? (
+                            <Chip
+                              size="small"
+                              label={getPaymentStatusLabel(sale.paymentStatus)}
+                              sx={{
+                                bgcolor: paymentStyle.backgroundColor,
+                                color: paymentStyle.color,
+                                fontWeight: 800,
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              size="small"
+                              label="Restringido"
+                              variant="outlined"
+                            />
+                          )}
                         </TableCell>
 
                         <TableCell>
@@ -1440,7 +1457,7 @@ export function SalesPage() {
                             )}
                           </Typography>
 
-                          {sale.balance > 0 && (
+                          {canViewFinancials && sale.balance > 0 && (
                             <Typography
                               variant="caption"
                               color="error.main"
@@ -1656,46 +1673,36 @@ export function SalesPage() {
                                   </Typography>
                                 </Paper>
 
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 1.5 }}
-                                >
-                                  <Typography variant="caption">
-                                    Pagado
-                                  </Typography>
-
-                                  <Typography
-                                    fontWeight={800}
-                                    color="success.main"
+                                {canViewFinancials && (
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{ p: 1.5 }}
                                   >
-                                    {formatCurrency(
-                                      sale.paidAmount,
-                                    )}
-                                  </Typography>
-                                </Paper>
+                                    <Typography variant="caption">
+                                      Pagado
+                                    </Typography>
+                                    <Typography fontWeight={800} color="success.main">
+                                      {formatCurrency(sale.paidAmount)}
+                                    </Typography>
+                                  </Paper>
+                                )}
 
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 1.5 }}
-                                >
-                                  <Typography variant="caption">
-                                    Saldo
-                                  </Typography>
-
-                                  <Typography
-                                    fontWeight={800}
-                                    color={
-                                      sale.balance >
-                                      0
-                                        ? 'error.main'
-                                        : 'success.main'
-                                    }
+                                {canViewFinancials && (
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{ p: 1.5 }}
                                   >
-                                    {formatCurrency(
-                                      sale.balance,
-                                    )}
-                                  </Typography>
-                                </Paper>
+                                    <Typography variant="caption">
+                                      Saldo
+                                    </Typography>
+                                    <Typography
+                                      fontWeight={800}
+                                      color={sale.balance > 0 ? 'error.main' : 'success.main'}
+                                    >
+                                      {formatCurrency(sale.balance)}
+                                    </Typography>
+                                  </Paper>
+                                )}
                               </Box>
 
                               {sale.observations && (
