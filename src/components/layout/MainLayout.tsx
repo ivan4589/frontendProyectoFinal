@@ -24,63 +24,29 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import SecurityIcon from '@mui/icons-material/Security';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
 const drawerWidth = 260;
 
 const menuItems = [
-  {
-    text: 'Dashboard',
-    path: '/dashboard',
-    icon: <DashboardIcon />,
-  },
-  {
-    text: 'Clientes',
-    path: '/clients',
-    icon: <PeopleIcon />,
-  },
-  {
-    text: 'Proveedores',
-    path: '/providers',
-    icon: <LocalShippingIcon />,
-  },
-  {
-    text: 'Productos',
-    path: '/products',
-    icon: <InventoryIcon />,
-  },
-  {
-    text: 'Inventario',
-    path: '/inventory',
-    icon: <Inventory2Icon />,
-  },
-  {
-    text: 'Compras',
-    path: '/purchases',
-    icon: <ShoppingCartIcon />,
-  },
+  { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+  { text: 'Clientes', path: '/clients', icon: <PeopleIcon /> },
+  { text: 'Proveedores', path: '/providers', icon: <LocalShippingIcon /> },
+  { text: 'Productos', path: '/products', icon: <InventoryIcon /> },
+  { text: 'Inventario', path: '/inventory', icon: <Inventory2Icon /> },
+  { text: 'Compras', path: '/purchases', icon: <ShoppingCartIcon /> },
   {
     text: 'Transferencias',
     path: '/warehouse-transfers',
     icon: <SwapHorizIcon />,
     adminOnly: true,
   },
-  {
-    text: 'Ventas',
-    path: '/sales',
-    icon: <ReceiptIcon />,
-  },
-  {
-    text: 'Cobranza',
-    path: '/collections',
-    icon: <AccountBalanceWalletIcon />,
-  },
-  {
-    text: 'Reportes',
-    path: '/reports',
-    icon: <AssessmentIcon />,
-  },
+  { text: 'Ventas', path: '/sales', icon: <ReceiptIcon /> },
+  { text: 'Cobranza', path: '/collections', icon: <AccountBalanceWalletIcon /> },
+  { text: 'Reportes', path: '/reports', icon: <AssessmentIcon /> },
+  { text: 'Mi seguridad', path: '/security', icon: <SecurityIcon /> },
   {
     text: 'Administración',
     path: '/administration',
@@ -93,15 +59,14 @@ export function MainLayout() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   const userLabel = user?.name || user?.email || 'Usuario';
   const visibleMenuItems = menuItems.filter(
-    (item) =>
-      !item.adminOnly || user?.role === 'ADMIN',
+    (item) => !item.adminOnly || user?.role === 'ADMIN',
   );
 
   return (
@@ -127,7 +92,6 @@ export function MainLayout() {
               <Typography variant="body2" sx={{ lineHeight: 1.1 }}>
                 {userLabel}
               </Typography>
-
               <Typography variant="caption" sx={{ opacity: 0.8 }}>
                 {user?.role || 'Sin rol'}
               </Typography>
@@ -170,11 +134,9 @@ export function MainLayout() {
               mb: 1,
             }}
           />
-
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
             Yungas Distribuidora
           </Typography>
-
           <Typography variant="caption" color="text.secondary">
             Ventas e Inventarios
           </Typography>
@@ -193,9 +155,7 @@ export function MainLayout() {
                   '&.active': {
                     backgroundColor: '#063f2d',
                     color: '#ffffff',
-                    '& .MuiListItemIcon-root': {
-                      color: '#ffffff',
-                    },
+                    '& .MuiListItemIcon-root': { color: '#ffffff' },
                   },
                 }}
               >
@@ -216,7 +176,6 @@ export function MainLayout() {
         }}
       >
         <Toolbar />
-
         <Container maxWidth="xl" sx={{ py: 3 }}>
           <Outlet />
         </Container>
