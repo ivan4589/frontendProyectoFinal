@@ -12,6 +12,8 @@ export interface AuthUser {
   role?: UserRole;
   status?: string;
   twoFactorEnabled?: boolean;
+  emailVerifiedAt?: string | null;
+  lastLoginAt?: string | null;
 }
 
 export interface LoginResponse {
@@ -42,6 +44,17 @@ export interface RegistrationRequest {
   status: 'PENDING_EMAIL_VERIFICATION' | 'PENDING_ADMIN_APPROVAL';
   emailVerifiedAt?: string | null;
   createdAt: string;
+}
+
+export interface AuthSession {
+  id: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  deviceName: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  createdAt: string;
+  current: boolean;
 }
 
 export interface DecodedToken {
