@@ -12,6 +12,11 @@ import {
   VerifyEmailPage,
 } from '../features/auth/AuthSecurityPages';
 import { useAuth } from '../features/auth/AuthContext';
+import {
+  hasAnyPermission,
+  PERMISSIONS,
+  type Permission,
+} from '../features/auth/permissions';
 import { SecuritySettingsPage } from '../features/auth/SecuritySettingsPage';
 import { SecureLoginPage } from '../features/auth/SecureLoginPage';
 import { ClientsPage } from '../features/clients/ClientsPage';
@@ -43,12 +48,28 @@ function RequireAuth({ children }: { children: ReactNode }) {
 function PublicOnly({ children }: { children: ReactNode }) {
   const { isAuthenticated, initializing } = useAuth();
   if (initializing) return <LoadingSession />;
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+  return isAuthenticated ? <HomeRedirect /> : <>{children}</>;
 }
 
-function RequireAdmin({ children }: { children: ReactNode }) {
+function RequirePermission({
+  permissions,
+  children,
+}: {
+  permissions: Permission[];
+  children: ReactNode;
+}) {
   const { user } = useAuth();
-  return user?.role === 'ADMIN' ? <>{children}</> : <Navigate to="/dashboard" replace />;
+  return hasAnyPermission(user?.role, permissions) ? (
+    <>{children}</>
+  ) : (
+    <HomeRedirect />
+  );
+}
+
+function HomeRedirect() {
+  const { user } = useAuth();
+  const destination = user?.role === 'COBRADOR' ? '/collections' : '/dashboard';
+  return <Navigate to={destination} replace />;
 }
 
 export function AppRouter() {
@@ -62,24 +83,24 @@ export function AppRouter() {
       <Route path="/segundo-factor" element={<PublicOnly><TwoFactorPage /></PublicOnly>} />
 
       <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="clients" element={<ClientsPage />} />
-        <Route path="providers" element={<ProvidersPage />} />
-        <Route path="products" element={<ProductsPage />} />
-        <Route path="inventory" element={<InventoryPage />} />
-        <Route path="purchases" element={<PurchasesPage />} />
-        <Route path="warehouse-transfers" element={<RequireAdmin><WarehouseTransfersPage /></RequireAdmin>} />
-        <Route path="sales" element={<SalesPage />} />
-        <Route path="collections" element={<CollectionsPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="security" element={<SecuritySettingsPage />} />
-        <Route path="administration" element={<RequireAdmin><AdministrationPage /></RequireAdmin>} />
-        <Route path="administration/registration-requests" element={<RequireAdmin><RegistrationRequestsPage /></RequireAdmin>} />
+        <Route index element={<HomeRedirect />} />
+        <Route path="dashboard" element={<RequirePermission permissions={[PERMISSIONS.DASHBOARD_VIEW]}><DashboardPage /></RequirePermission>} />
+        <Route path="clients" element={<RequirePermission permissions={[PERMISSIONS.CLIENTS_VIEW]}><ClientsPage /></RequirePermission>} />
+        <Route path="providers" element={<RequirePermission permissions={[PERMISSIONS.PROVIDERS_VIEW]}><ProvidersPage /></RequirePermission>} />
+        <Route path="products" element={<RequirePermission permissions={[PERMISSIONS.PRODUCTS_VIEW]}><ProductsPage /></RequirePermission>} />
+        <Route path="inventory" element={<RequirePermission permissions={[PERMISSIONS.INVENTORY_VIEW]}><InventoryPage /></RequirePermission>} />
+        <Route path="purchases" element={<RequirePermission permissions={[PERMISSIONS.PURCHASES_VIEW]}><PurchasesPage /></RequirePermission>} />
+        <Route path="warehouse-transfers" element={<RequirePermission permissions={[PERMISSIONS.INVENTORY_TRANSFER]}><WarehouseTransfersPage /></RequirePermission>} />
+        <Route path="sales" element={<RequirePermission permissions={[PERMISSIONS.SALES_VIEW_ALL, PERMISSIONS.SALES_VIEW_ASSIGNED]}><SalesPage /></RequirePermission>} />
+        <Route path="collections" element={<RequirePermission permissions={[PERMISSIONS.COLLECTIONS_VIEW_ALL, PERMISSIONS.COLLECTIONS_VIEW_OWN_SALES, PERMISSIONS.COLLECTIONS_VIEW_ASSIGNED]}><CollectionsPage /></RequirePermission>} />
+        <Route path="reports" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />
+        <Route path="security" element={<RequirePermission permissions={[PERMISSIONS.SECURITY_SELF_MANAGE]}><SecuritySettingsPage /></RequirePermission>} />
+        <Route path="administration" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><AdministrationPage /></RequirePermission>} />
+        <Route path="administration/registration-requests" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><RegistrationRequestsPage /></RequirePermission>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
