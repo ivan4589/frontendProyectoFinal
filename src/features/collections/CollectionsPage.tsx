@@ -60,6 +60,7 @@ import type { PaymentMethod } from '../../types/sale.types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
 import { useAuth } from '../auth/AuthContext';
+import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
 type DebtFilter =
   | 'ALL'
@@ -128,6 +129,13 @@ export function CollectionsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const canRegisterPayment = hasPermission(
+    user?.role,
+    PERMISSIONS.PAYMENTS_CREATE_ASSIGNED,
+  );
+  const canDownloadOwnCollectionReport =
+    user?.role === 'COBRADOR' &&
+    hasPermission(user?.role, PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED);
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] =
@@ -466,7 +474,7 @@ export function CollectionsPage() {
             </>
           )}
 
-          {!isAdmin && user?.id && (
+          {canDownloadOwnCollectionReport && user?.id && (
             <Button
               variant="contained"
               startIcon={<FileDownloadIcon />}
@@ -824,9 +832,9 @@ export function CollectionsPage() {
                     <TableBody>
                       {client.sales.map((sale) => {
                         const canCollect =
-                          isAdmin ||
-                          sale.assignment
-                            ?.assignedToId === user?.id;
+                          canRegisterPayment &&
+                          (isAdmin ||
+                            sale.assignment?.assignedToId === user?.id);
 
                         return (
                           <TableRow key={sale.id}>
@@ -983,22 +991,18 @@ export function CollectionsPage() {
                               )}
                             </TableCell>
                             <TableCell align="right">
-                              <Button
-                                variant="contained"
-                                size="small"
-                                startIcon={
-                                  <PaymentsIcon />
-                                }
-                                disabled={!canCollect}
-                                onClick={() =>
-                                  openPaymentDialog(
-                                    client,
-                                    sale,
-                                  )
-                                }
-                              >
-                                Registrar pago
-                              </Button>
+                              {canCollect && (
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  startIcon={<PaymentsIcon />}
+                                  onClick={() =>
+                                    openPaymentDialog(client, sale)
+                                  }
+                                >
+                                  Registrar pago
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );

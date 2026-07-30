@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   AppBar,
   Avatar,
@@ -38,7 +39,7 @@ const drawerWidth = 260;
 type MenuItem = {
   text: string;
   path: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   permissions: Permission[];
 };
 

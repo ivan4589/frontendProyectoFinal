@@ -66,6 +66,7 @@ import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { Loading } from '../../components/common/Loading';
 
 import { useAuth } from '../auth/AuthContext';
+import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
 import { formatCurrency } from '../../utils/formatCurrency';
 import {
@@ -282,13 +283,16 @@ function isInsideDateRange(
 export function SalesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-
-  const canManageSales =
-    user?.role === 'ADMIN' ||
-    user?.role === 'VENDEDOR';
-
-  const isAdmin =
-    user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'ADMIN';
+  const canCreateSale = hasPermission(user?.role, PERMISSIONS.SALES_CREATE);
+  const canCancelSale = hasPermission(user?.role, PERMISSIONS.SALES_CANCEL);
+  const canDownloadAllSales = hasPermission(
+    user?.role,
+    PERMISSIONS.SALES_DOWNLOAD_ALL,
+  );
+  const canManageOwnSale = (sale: Sale) =>
+    isAdmin ||
+    (user?.role === 'VENDEDOR' && sale.userId === user?.id);
 
   const [search, setSearch] =
     useState('');
@@ -1218,7 +1222,7 @@ export function SalesPage() {
               </Button>
             )}
 
-            {canManageSales && (
+            {canCreateSale && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
@@ -1294,12 +1298,11 @@ export function SalesPage() {
                       sale.paymentStatus,
                     );
 
-                  const documentUrl =
-                    sale.status ===
-                      'CANCELLED' &&
-                    sale.cancelledPdfUrl
+                  const documentUrl = canDownloadAllSales
+                    ? sale.status === 'CANCELLED' && sale.cancelledPdfUrl
                       ? sale.cancelledPdfUrl
-                      : sale.pdfUrl;
+                      : sale.pdfUrl
+                    : undefined;
 
                   const whatsappDisabledReason =
                     !sale.clientPhone
@@ -1467,7 +1470,7 @@ export function SalesPage() {
                             </Tooltip>
                           )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'PENDING' && (
                               <>
@@ -1503,7 +1506,7 @@ export function SalesPage() {
                               </>
                             )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip title="Registrar devolución">
@@ -1521,7 +1524,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip
@@ -1567,7 +1570,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {isAdmin &&
+                          {canCancelSale &&
                             sale.status !==
                               'CANCELLED' && (
                               <Tooltip title="Anular venta">

@@ -53,6 +53,8 @@ import type {
 import { formatDate } from '../../utils/formatDate';
 import { ClientFormDialog } from './ClientFormDialog';
 import { LocationsDialog } from './LocationsDialog';
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
 function getErrorMessage(error: unknown) {
   const anyError = error as any;
@@ -127,6 +129,11 @@ function getSalesCount(client: Client) {
 
 export function ClientsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canCreateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_CREATE);
+  const canUpdateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_UPDATE);
+  const canDeleteClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_DELETE);
+  const canManageLocations = hasPermission(user?.role, PERMISSIONS.CATALOG_MANAGE);
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ClientType | 'ALL'>('ALL');
@@ -490,30 +497,34 @@ export function ClientsPage() {
               ))}
             </TextField>
 
-            <Button
-              variant="outlined"
-              startIcon={<ManageSearchIcon />}
-              onClick={() => setLocationsDialogOpen(true)}
-              sx={{ fontWeight: 800, textTransform: 'none' }}
-            >
-              Localidades
-            </Button>
+            {canManageLocations && (
+              <Button
+                variant="outlined"
+                startIcon={<ManageSearchIcon />}
+                onClick={() => setLocationsDialogOpen(true)}
+                sx={{ fontWeight: 800, textTransform: 'none' }}
+              >
+                Localidades
+              </Button>
+            )}
 
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClient}
-              sx={{
-                backgroundColor: '#005b3f',
-                fontWeight: 800,
-                textTransform: 'none',
-                '&:hover': {
-                  backgroundColor: '#00432f',
-                },
-              }}
-            >
-              Nuevo cliente
-            </Button>
+            {canCreateClient && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleCreateClient}
+                sx={{
+                  backgroundColor: '#005b3f',
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  '&:hover': {
+                    backgroundColor: '#00432f',
+                  },
+                }}
+              >
+                Nuevo cliente
+              </Button>
+            )}
           </Stack>
         </Stack>
 
@@ -639,22 +650,26 @@ export function ClientsPage() {
                     </TableCell>
 
                     <TableCell align="right">
-                      <Tooltip title="Editar">
-                        <IconButton size="small" onClick={() => handleEditClient(client)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {canUpdateClient && (
+                        <Tooltip title="Editar">
+                          <IconButton size="small" onClick={() => handleEditClient(client)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
 
-                      <Tooltip title="Eliminar">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          disabled={deleteClientMutation.isPending}
-                          onClick={() => handleDeleteClient(client)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {canDeleteClient && (
+                        <Tooltip title="Eliminar">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled={deleteClientMutation.isPending}
+                            onClick={() => handleDeleteClient(client)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
