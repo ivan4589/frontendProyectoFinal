@@ -1,6 +1,6 @@
 \n===== npm ci =====
 
-added 281 packages, and audited 282 packages in 12s
+added 281 packages, and audited 282 packages in 14s
 
 67 packages are looking for funding
   run `npm fund` for details
@@ -15,6 +15,24 @@ To address all issues (including breaking changes), run:
 
 Run `npm audit` for details.
 EXIT_CODE=0
+\n===== production audit =====
+# npm audit report
+
+react-router  7.12.0 - 8.2.0
+Severity: high
+React Router: RSC Mode CSRF Bypass Allows Action Execution Before 400 Response - https://github.com/advisories/GHSA-qwww-vcr4-c8h2
+fix available via `npm audit fix --force`
+Will install react-router-dom@7.11.0, which is a breaking change
+node_modules/react-router
+  react-router-dom  >=7.12.0-pre.0
+  Depends on vulnerable versions of react-router
+  node_modules/react-router-dom
+
+2 high severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+EXIT_CODE=1
 \n===== npm run build =====
 
 > sistema-ventas-frontend@0.0.0 build
@@ -26,13 +44,14 @@ rendering chunks...
 computing gzip size...
 dist/index.html                     0.47 kB │ gzip:   0.30 kB
 dist/assets/index-CPv873tO.css      0.17 kB │ gzip:   0.16 kB
-dist/assets/index-BNf5bpgh.js   1,325.16 kB │ gzip: 387.74 kB
+dist/assets/index-DQWAfS7Y.js   1,325.17 kB │ gzip: 387.75 kB
 
-[32m✓ built in 1.28s[39m
+[32m✓ built in 1.35s[39m
 [33m[plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
 EXIT_CODE=0
-\nFINAL_STATUS=0
+\nPRODUCTION_AUDIT_STATUS=1
+FINAL_STATUS=0
