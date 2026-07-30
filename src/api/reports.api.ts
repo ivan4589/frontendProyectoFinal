@@ -38,3 +38,15 @@ export async function generateAnalyticsReportPdf(
 
   return response.data;
 }
+
+export async function generateSalesMatrixPdf(
+  filters: AnalyticsReportFilters,
+) {
+  const response = await api.post<ReportPdfResponse>(
+    "/reports/pdf/sales-detail/matrix",
+    undefined,
+    { params: filters },
+  );
+
+  return response.data;
+}
