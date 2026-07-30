@@ -2,11 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import { loginRequest } from '../../api/auth.api';
+import { restoreSession } from '../../api/axios';
+import { loginRequest, logoutRequest } from '../../api/auth.api';
 import type {
   AuthUser,
   LoginRequest,
@@ -16,30 +18,21 @@ import {
   clearToken,
   decodeToken,
   getToken,
-  isTokenExpired,
   saveToken,
+  subscribeToken,
 } from './authStorage';
 
 interface AuthContextValue {
   token: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
+  initializing: boolean;
   login: (data: LoginRequest, remember: boolean) => Promise<LoginResponse>;
-  completeLogin: (response: LoginResponse, remember: boolean) => void;
-  logout: () => void;
+  completeLogin: (response: LoginResponse) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function getInitialToken() {
-  const token = getToken();
-  if (!token) return null;
-  if (isTokenExpired(token)) {
-    clearToken();
-    return null;
-  }
-  return token;
-}
 
 function getUserFromToken(token: string | null): AuthUser | null {
   if (!token) return null;
@@ -58,33 +51,39 @@ function responseToken(response: LoginResponse) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => getInitialToken());
+  const [token, setToken] = useState<string | null>(() => getToken());
+  const [initializing, setInitializing] = useState(true);
   const user = useMemo(() => getUserFromToken(token), [token]);
 
-  const completeLogin = useCallback(
-    (response: LoginResponse, remember: boolean) => {
-      const receivedToken = responseToken(response);
-      if (!receivedToken || !decodeToken(receivedToken)) {
-        throw new Error('El servidor no devolvió una sesión válida');
-      }
-      saveToken(receivedToken, remember);
-      setToken(receivedToken);
-    },
-    [],
-  );
+  useEffect(() => {
+    const unsubscribe = subscribeToken(setToken);
+    restoreSession().finally(() => setInitializing(false));
+    return unsubscribe;
+  }, []);
+
+  const completeLogin = useCallback((response: LoginResponse) => {
+    const receivedToken = responseToken(response);
+    if (!receivedToken || !decodeToken(receivedToken)) {
+      throw new Error('El servidor no devolvió una sesión válida');
+    }
+    saveToken(receivedToken);
+  }, []);
 
   const login = useCallback(
-    async (data: LoginRequest, remember: boolean) => {
+    async (data: LoginRequest, _remember: boolean) => {
       const response = await loginRequest(data);
-      if (responseToken(response)) completeLogin(response, remember);
+      if (responseToken(response)) completeLogin(response);
       return response;
     },
     [completeLogin],
   );
 
-  const logout = useCallback(() => {
-    clearToken();
-    setToken(null);
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      clearToken();
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -92,11 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       user,
       isAuthenticated: Boolean(token),
+      initializing,
       login,
       completeLogin,
       logout,
     }),
-    [token, user, login, completeLogin, logout],
+    [token, user, initializing, login, completeLogin, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
