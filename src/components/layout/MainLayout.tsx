@@ -12,46 +12,117 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import LogoutIcon from '@mui/icons-material/Logout';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PeopleIcon from '@mui/icons-material/People';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import SecurityIcon from '@mui/icons-material/Security';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
+import {
+  hasAnyPermission,
+  PERMISSIONS,
+  type Permission,
+} from '../../features/auth/permissions';
 
 const drawerWidth = 260;
 
-const menuItems = [
-  { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-  { text: 'Clientes', path: '/clients', icon: <PeopleIcon /> },
-  { text: 'Proveedores', path: '/providers', icon: <LocalShippingIcon /> },
-  { text: 'Productos', path: '/products', icon: <InventoryIcon /> },
-  { text: 'Inventario', path: '/inventory', icon: <Inventory2Icon /> },
-  { text: 'Compras', path: '/purchases', icon: <ShoppingCartIcon /> },
+type MenuItem = {
+  text: string;
+  path: string;
+  icon: React.ReactNode;
+  permissions: Permission[];
+};
+
+const menuItems: MenuItem[] = [
+  {
+    text: 'Dashboard',
+    path: '/dashboard',
+    icon: <DashboardIcon />,
+    permissions: [PERMISSIONS.DASHBOARD_VIEW],
+  },
+  {
+    text: 'Clientes',
+    path: '/clients',
+    icon: <PeopleIcon />,
+    permissions: [PERMISSIONS.CLIENTS_VIEW],
+  },
+  {
+    text: 'Proveedores',
+    path: '/providers',
+    icon: <LocalShippingIcon />,
+    permissions: [PERMISSIONS.PROVIDERS_VIEW],
+  },
+  {
+    text: 'Productos',
+    path: '/products',
+    icon: <InventoryIcon />,
+    permissions: [PERMISSIONS.PRODUCTS_VIEW],
+  },
+  {
+    text: 'Inventario',
+    path: '/inventory',
+    icon: <Inventory2Icon />,
+    permissions: [PERMISSIONS.INVENTORY_VIEW],
+  },
+  {
+    text: 'Compras',
+    path: '/purchases',
+    icon: <ShoppingCartIcon />,
+    permissions: [PERMISSIONS.PURCHASES_VIEW],
+  },
   {
     text: 'Transferencias',
     path: '/warehouse-transfers',
     icon: <SwapHorizIcon />,
-    adminOnly: true,
+    permissions: [PERMISSIONS.INVENTORY_TRANSFER],
   },
-  { text: 'Ventas', path: '/sales', icon: <ReceiptIcon /> },
-  { text: 'Cobranza', path: '/collections', icon: <AccountBalanceWalletIcon /> },
-  { text: 'Reportes', path: '/reports', icon: <AssessmentIcon /> },
-  { text: 'Mi seguridad', path: '/security', icon: <SecurityIcon /> },
+  {
+    text: 'Ventas',
+    path: '/sales',
+    icon: <ReceiptIcon />,
+    permissions: [PERMISSIONS.SALES_VIEW_ALL, PERMISSIONS.SALES_VIEW_ASSIGNED],
+  },
+  {
+    text: 'Cobranza',
+    path: '/collections',
+    icon: <AccountBalanceWalletIcon />,
+    permissions: [
+      PERMISSIONS.COLLECTIONS_VIEW_ALL,
+      PERMISSIONS.COLLECTIONS_VIEW_OWN_SALES,
+      PERMISSIONS.COLLECTIONS_VIEW_ASSIGNED,
+    ],
+  },
+  {
+    text: 'Reportes',
+    path: '/reports',
+    icon: <AssessmentIcon />,
+    permissions: [
+      PERMISSIONS.REPORTS_FINANCIAL,
+      PERMISSIONS.REPORTS_SALES_ALL,
+      PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED,
+      PERMISSIONS.REPORTS_INVENTORY,
+    ],
+  },
+  {
+    text: 'Mi seguridad',
+    path: '/security',
+    icon: <SecurityIcon />,
+    permissions: [PERMISSIONS.SECURITY_SELF_MANAGE],
+  },
   {
     text: 'Administración',
     path: '/administration',
     icon: <AdminPanelSettingsIcon />,
-    adminOnly: true,
+    permissions: [PERMISSIONS.USERS_MANAGE],
   },
 ];
 
@@ -65,8 +136,8 @@ export function MainLayout() {
   };
 
   const userLabel = user?.name || user?.email || 'Usuario';
-  const visibleMenuItems = menuItems.filter(
-    (item) => !item.adminOnly || user?.role === 'ADMIN',
+  const visibleMenuItems = menuItems.filter((item) =>
+    hasAnyPermission(user?.role, item.permissions),
   );
 
   return (
@@ -82,12 +153,10 @@ export function MainLayout() {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Yungas Distribuidora
           </Typography>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Avatar sx={{ width: 32, height: 32, bgcolor: '#0b6b4a' }}>
               {userLabel.charAt(0).toUpperCase()}
             </Avatar>
-
             <Box sx={{ display: { xs: 'none', md: 'block' } }}>
               <Typography variant="body2" sx={{ lineHeight: 1.1 }}>
                 {userLabel}
@@ -96,7 +165,6 @@ export function MainLayout() {
                 {user?.role || 'Sin rol'}
               </Typography>
             </Box>
-
             <Button
               color="inherit"
               startIcon={<LogoutIcon />}
@@ -121,18 +189,12 @@ export function MainLayout() {
         }}
       >
         <Toolbar />
-
         <Box sx={{ px: 2, py: 2, textAlign: 'center' }}>
           <Box
             component="img"
             src="/brand/logo-yungas.jpeg"
             alt="Yungas Distribuidora"
-            sx={{
-              width: 70,
-              height: 70,
-              objectFit: 'contain',
-              mb: 1,
-            }}
+            sx={{ width: 70, height: 70, objectFit: 'contain', mb: 1 }}
           />
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
             Yungas Distribuidora
