@@ -1,0 +1,97 @@
+name: Tighten RBAC UI
+
+on:
+  push:
+    branches:
+      - agent/roles-permisos-alcance-datos
+    paths:
+      - '.github/workflows/tighten-rbac-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  tighten-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/roles-permisos-alcance-datos
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply strict collector scope
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'No se encontró el bloque esperado en {path}: {old[:100]!r}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'src/components/layout/MainLayout.tsx',
+              "      PERMISSIONS.REPORTS_SALES_ALL,\n      PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED,\n      PERMISSIONS.REPORTS_INVENTORY,",
+              "      PERMISSIONS.REPORTS_SALES_ALL,\n      PERMISSIONS.REPORTS_INVENTORY,",
+          )
+          replace_once(
+              'src/routes/AppRouter.tsx',
+              "<Route path=\"reports\" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />",
+              "<Route path=\"reports\" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />",
+          )
+
+          sales_path = Path('src/features/sales/SalesPage.tsx')
+          sales = sales_path.read_text(encoding='utf-8')
+          query_blocks = [
+              "    queryKey: ['clients'],\n    queryFn: () => getClients(),\n  });",
+              "    queryKey: ['products'],\n    queryFn: () => getProducts(),\n  });",
+              "    queryKey: ['categories'],\n    queryFn: getCategories,\n  });",
+              "    queryKey: ['sub-categories'],\n    queryFn: () =>\n      getSubCategories(),\n  });",
+          ]
+          replacements = [
+              "    queryKey: ['clients'],\n    queryFn: () => getClients(),\n    enabled: canCreateSale,\n  });",
+              "    queryKey: ['products'],\n    queryFn: () => getProducts(),\n    enabled: canCreateSale,\n  });",
+              "    queryKey: ['categories'],\n    queryFn: getCategories,\n    enabled: canCreateSale,\n  });",
+              "    queryKey: ['sub-categories'],\n    queryFn: () =>\n      getSubCategories(),\n    enabled: canCreateSale,\n  });",
+          ]
+          for old, new in zip(query_blocks, replacements):
+              if old not in sales:
+                  raise SystemExit(f'No se encontró una consulta auxiliar en SalesPage: {old[:50]!r}')
+              sales = sales.replace(old, new, 1)
+
+          old_loading = """  if (\n    salesLoading ||\n    clientsLoading ||\n    productsLoading ||\n    categoriesLoading ||\n    subCategoriesLoading\n  ) {"""
+          new_loading = """  if (\n    salesLoading ||\n    (canCreateSale &&\n      (clientsLoading ||\n        productsLoading ||\n        categoriesLoading ||\n        subCategoriesLoading))\n  ) {"""
+          if old_loading not in sales:
+              raise SystemExit('No se encontró el bloque de carga de SalesPage')
+          sales = sales.replace(old_loading, new_loading, 1)
+          sales = sales.replace('  if (clientsIsError) {', '  if (canCreateSale && clientsIsError) {', 1)
+          sales = sales.replace('  if (productsIsError) {', '  if (canCreateSale && productsIsError) {', 1)
+          sales = sales.replace('  if (categoriesIsError) {', '  if (canCreateSale && categoriesIsError) {', 1)
+          sales = sales.replace('  if (subCategoriesIsError) {', '  if (canCreateSale && subCategoriesIsError) {', 1)
+          sales_path.write_text(sales, encoding='utf-8')
+          PY
+      - name: Install and build
+        id: build
+        continue-on-error: true
+        run: |
+          npm ci
+          npm run build
+      - name: Record and commit
+        shell: bash
+        run: |
+          {
+            echo "RBAC_UI_STRICT_BUILD_OUTCOME=${{ steps.build.outcome }}"
+            echo "Validated at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > .github/rbac-ui-strict-validation.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src .github/rbac-ui-strict-validation.txt
+          git commit -m "Restringe interfaz del cobrador a datos asignados"
+          git push origin HEAD:agent/roles-permisos-alcance-datos
+          test "${{ steps.build.outcome }}" = "success"
