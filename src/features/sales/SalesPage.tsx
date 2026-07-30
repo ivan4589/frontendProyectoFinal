@@ -361,6 +361,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['clients'],
     queryFn: () => getClients(),
+    enabled: canCreateSale,
   });
 
   const {
@@ -371,6 +372,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['products'],
     queryFn: () => getProducts(),
+    enabled: canCreateSale,
   });
 
   const {
@@ -381,6 +383,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
+    enabled: canCreateSale,
   });
 
   const {
@@ -392,6 +395,7 @@ export function SalesPage() {
     queryKey: ['sub-categories'],
     queryFn: () =>
       getSubCategories(),
+    enabled: canCreateSale,
   });
 
   const filteredSales = useMemo(() => {
@@ -778,10 +782,11 @@ export function SalesPage() {
 
   if (
     salesLoading ||
-    clientsLoading ||
-    productsLoading ||
-    categoriesLoading ||
-    subCategoriesLoading
+    (canCreateSale &&
+      (clientsLoading ||
+        productsLoading ||
+        categoriesLoading ||
+        subCategoriesLoading))
   ) {
     return (
       <Loading message="Cargando ventas..." />
@@ -798,7 +803,7 @@ export function SalesPage() {
     );
   }
 
-  if (clientsIsError) {
+  if (canCreateSale && clientsIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -808,7 +813,7 @@ export function SalesPage() {
     );
   }
 
-  if (productsIsError) {
+  if (canCreateSale && productsIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -818,7 +823,7 @@ export function SalesPage() {
     );
   }
 
-  if (categoriesIsError) {
+  if (canCreateSale && categoriesIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -828,7 +833,7 @@ export function SalesPage() {
     );
   }
 
-  if (subCategoriesIsError) {
+  if (canCreateSale && subCategoriesIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(

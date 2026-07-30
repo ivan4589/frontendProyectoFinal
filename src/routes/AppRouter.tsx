@@ -93,7 +93,7 @@ export function AppRouter() {
         <Route path="warehouse-transfers" element={<RequirePermission permissions={[PERMISSIONS.INVENTORY_TRANSFER]}><WarehouseTransfersPage /></RequirePermission>} />
         <Route path="sales" element={<RequirePermission permissions={[PERMISSIONS.SALES_VIEW_ALL, PERMISSIONS.SALES_VIEW_ASSIGNED]}><SalesPage /></RequirePermission>} />
         <Route path="collections" element={<RequirePermission permissions={[PERMISSIONS.COLLECTIONS_VIEW_ALL, PERMISSIONS.COLLECTIONS_VIEW_OWN_SALES, PERMISSIONS.COLLECTIONS_VIEW_ASSIGNED]}><CollectionsPage /></RequirePermission>} />
-        <Route path="reports" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_COLLECTIONS_ASSIGNED, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />
+        <Route path="reports" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />
         <Route path="security" element={<RequirePermission permissions={[PERMISSIONS.SECURITY_SELF_MANAGE]}><SecuritySettingsPage /></RequirePermission>} />
         <Route path="administration" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><AdministrationPage /></RequirePermission>} />
         <Route path="administration/registration-requests" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><RegistrationRequestsPage /></RequirePermission>} />
