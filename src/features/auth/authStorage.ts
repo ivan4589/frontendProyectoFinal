@@ -1,23 +1,35 @@
 import type { DecodedToken } from '../../types/auth.types';
 
 const TOKEN_KEY = 'access_token';
+let accessToken: string | null = null;
+const listeners = new Set<(token: string | null) => void>();
 
-export function saveToken(token: string, remember: boolean) {
-  clearToken();
-
-  if (remember) {
-    localStorage.setItem(TOKEN_KEY, token);
-    return;
-  }
-
-  sessionStorage.setItem(TOKEN_KEY, token);
+export function saveToken(token: string) {
+  accessToken = token;
+  removeLegacyTokens();
+  notify();
 }
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
 export function clearToken() {
+  accessToken = null;
+  removeLegacyTokens();
+  notify();
+}
+
+export function subscribeToken(listener: (token: string | null) => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notify() {
+  listeners.forEach((listener) => listener(accessToken));
+}
+
+function removeLegacyTokens() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
 }
@@ -25,25 +37,24 @@ export function clearToken() {
 export function decodeToken(token: string): DecodedToken | null {
   try {
     const parts = token.split('.');
-
-    if (parts.length !== 3) {
-      return null;
-    }
+    if (parts.length !== 3) return null;
 
     const payload = parts[1];
-
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
     const jsonPayload = decodeURIComponent(
       window
-        .atob(base64)
+        .atob(padded)
         .split('')
-        .map((char) => {
-          return `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`;
-        })
+        .map(
+          (char) =>
+            `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`,
+        )
         .join(''),
     );
-
     return JSON.parse(jsonPayload);
   } catch {
     return null;
@@ -52,14 +63,7 @@ export function decodeToken(token: string): DecodedToken | null {
 
 export function isTokenExpired(token: string) {
   const decoded = decodeToken(token);
-
-  if (!decoded) {
-    return true;
-  }
-
-  if (!decoded.exp) {
-    return false;
-  }
-
-  return decoded.exp * 1000 < Date.now();
+  if (!decoded) return true;
+  if (!decoded.exp) return false;
+  return decoded.exp * 1000 <= Date.now();
 }
