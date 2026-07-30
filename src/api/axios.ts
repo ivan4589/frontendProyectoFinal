@@ -49,7 +49,7 @@ async function refreshAccessToken() {
   return refreshPromise;
 }
 
-function isPublicAuthenticationRequest(url?: string) {
+function mustNotRefresh(url?: string) {
   const path = (url || '').split('?')[0];
   return [
     '/auth/login',
@@ -59,6 +59,7 @@ function isPublicAuthenticationRequest(url?: string) {
     '/auth/forgot-password',
     '/auth/reset-password',
     '/auth/refresh',
+    '/auth/logout',
     '/auth/2fa/setup',
     '/auth/2fa/confirm',
     '/auth/2fa/verify',
@@ -80,7 +81,7 @@ api.interceptors.response.use(
       error.response?.status !== 401 ||
       !request ||
       request._retry ||
-      isPublicAuthenticationRequest(request.url)
+      mustNotRefresh(request.url)
     ) {
       return Promise.reject(error);
     }
