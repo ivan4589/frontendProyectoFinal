@@ -1,5 +1,7 @@
 import { api } from './axios';
 import type {
+  AuthSession,
+  AuthUser,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
@@ -51,10 +53,12 @@ export async function startTwoFactorSetup(token: string) {
 export async function confirmTwoFactor(
   challengeToken: string,
   code: string,
+  remember = false,
 ): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>('/auth/2fa/confirm', {
     challengeToken,
     code,
+    remember,
   });
   return response.data;
 }
@@ -62,10 +66,12 @@ export async function confirmTwoFactor(
 export async function verifyTwoFactor(
   challengeToken: string,
   code: string,
+  remember = false,
 ): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>('/auth/2fa/verify', {
     challengeToken,
     code,
+    remember,
   });
   return response.data;
 }
@@ -73,11 +79,60 @@ export async function verifyTwoFactor(
 export async function useRecoveryCode(
   challengeToken: string,
   recoveryCode: string,
+  remember = false,
 ): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>('/auth/2fa/recovery', {
     challengeToken,
     recoveryCode,
+    remember,
   });
+  return response.data;
+}
+
+export async function logoutRequest() {
+  const response = await api.post('/auth/logout', {});
+  return response.data;
+}
+
+export async function getCurrentUser() {
+  const response = await api.get<AuthUser>('/auth/me');
+  return response.data;
+}
+
+export async function getSessions() {
+  const response = await api.get<AuthSession[]>('/auth/sessions');
+  return response.data;
+}
+
+export async function revokeSession(id: string) {
+  const response = await api.delete(`/auth/sessions/${id}`);
+  return response.data as {
+    message: string;
+    currentSessionRevoked: boolean;
+  };
+}
+
+export async function logoutAllSessions() {
+  const response = await api.post('/auth/logout-all', {});
+  return response.data;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const response = await api.post('/auth/change-password', {
+    currentPassword,
+    newPassword,
+  });
+  return response.data;
+}
+
+export async function regenerateRecoveryCodes(password: string, code: string) {
+  const response = await api.post<{
+    message: string;
+    recoveryCodes: string[];
+  }>('/auth/2fa/recovery-codes/regenerate', { password, code });
   return response.data;
 }
 

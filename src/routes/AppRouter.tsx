@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Box, CircularProgress } from '@mui/material';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { AdministrationPage } from '../features/administration/AdministrationPage';
@@ -11,6 +12,7 @@ import {
   VerifyEmailPage,
 } from '../features/auth/AuthSecurityPages';
 import { useAuth } from '../features/auth/AuthContext';
+import { SecuritySettingsPage } from '../features/auth/SecuritySettingsPage';
 import { SecureLoginPage } from '../features/auth/SecureLoginPage';
 import { ClientsPage } from '../features/clients/ClientsPage';
 import { CollectionsPage } from '../features/collections/CollectionsPage';
@@ -24,13 +26,23 @@ import { ReportsPage } from '../features/reports/ReportsPage';
 import { SalesPage } from '../features/sales/SalesPage';
 import { WarehouseTransfersPage } from '../features/warehouse-transfers/WarehouseTransfersPage';
 
+function LoadingSession() {
+  return (
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+      <CircularProgress />
+    </Box>
+  );
+}
+
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, initializing } = useAuth();
+  if (initializing) return <LoadingSession />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function PublicOnly({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, initializing } = useAuth();
+  if (initializing) return <LoadingSession />;
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 }
 
@@ -61,6 +73,7 @@ export function AppRouter() {
         <Route path="sales" element={<SalesPage />} />
         <Route path="collections" element={<CollectionsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="security" element={<SecuritySettingsPage />} />
         <Route path="administration" element={<RequireAdmin><AdministrationPage /></RequireAdmin>} />
         <Route path="administration/registration-requests" element={<RequireAdmin><RegistrationRequestsPage /></RequireAdmin>} />
         <Route path="*" element={<NotFoundPage />} />
