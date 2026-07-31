@@ -7,44 +7,30 @@ import type {
 } from '../types/collection.types';
 
 export async function getCollectionDebts() {
-  const response =
-    await api.get<CollectionDebtsResponse>(
-      '/collections/debts',
-    );
-
+  const response = await api.get<CollectionDebtsResponse>('/collections/debts');
   return response.data;
 }
 
 export async function getCollectionAssignableUsers() {
-  const response =
-    await api.get<CollectionAssignableUser[]>(
-      '/collections/assignable-users',
-    );
-
+  const response = await api.get<CollectionAssignableUser[]>(
+    '/collections/assignable-users',
+  );
   return response.data;
 }
 
-export async function assignCollection(
-  saleId: string,
-  assignedToId: number,
-) {
+export async function assignCollection(saleId: string, assignedToId: number) {
   const response = await api.patch(
     `/collections/sales/${saleId}/assignment`,
-    {
-      assignedToId,
-    },
+    { assignedToId },
   );
-
   return response.data;
 }
 
-export async function unassignCollection(
-  saleId: string,
-) {
-  const response = await api.delete(
-    `/collections/sales/${saleId}/assignment`,
+export async function unassignCollection(saleId: string, reason: string) {
+  const response = await api.patch(
+    `/collections/sales/${saleId}/assignment/remove`,
+    { reason },
   );
-
   return response.data;
 }
 
@@ -56,30 +42,22 @@ export async function createCollectionPayment(
 }
 
 export async function generateGeneralDebtPdf() {
-  const response =
-    await api.post<CollectionPdfResponse>(
-      '/collections/reports/general-pdf',
-    );
-
+  const response = await api.post<CollectionPdfResponse>(
+    '/collections/reports/general-pdf',
+  );
   return response.data;
 }
 
 export async function generateAssignmentsPdf() {
-  const response =
-    await api.post<CollectionPdfResponse>(
-      '/collections/reports/assignments-pdf',
-    );
-
+  const response = await api.post<CollectionPdfResponse>(
+    '/collections/reports/assignments-pdf',
+  );
   return response.data;
 }
 
-export async function generateUserAssignmentsPdf(
-  userId: number,
-) {
-  const response =
-    await api.post<CollectionPdfResponse>(
-      `/collections/reports/users/${userId}/pdf`,
-    );
-
+export async function generateUserAssignmentsPdf(userId: number) {
+  const response = await api.post<CollectionPdfResponse>(
+    `/collections/reports/users/${userId}/pdf`,
+  );
   return response.data;
 }
