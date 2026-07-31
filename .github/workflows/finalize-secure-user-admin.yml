@@ -1,0 +1,47 @@
+name: Finalize secure user administration UI
+
+on:
+  push:
+    branches:
+      - agent/administracion-segura-usuarios
+    paths:
+      - '.github/workflows/finalize-secure-user-admin.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/administracion-segura-usuarios
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Repair lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Validate frontend
+        id: validate
+        continue-on-error: true
+        run: |
+          npm ci
+          npm run build
+      - name: Record and commit
+        shell: bash
+        run: |
+          {
+            echo "SECURE_USER_ADMIN_FRONTEND=${{ steps.validate.outcome }}"
+            echo "Validated at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > .github/secure-user-admin-frontend.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json .github/secure-user-admin-frontend.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Repara y valida administración segura"
+            git push origin HEAD:agent/administracion-segura-usuarios
+          fi
+          test "${{ steps.validate.outcome }}" = "success"
