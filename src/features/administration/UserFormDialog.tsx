@@ -15,6 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import type {
   CreateSystemUserRequest,
@@ -23,29 +24,28 @@ import type {
 } from '../../types/administration.types';
 import type { UserRole } from '../../types/auth.types';
 
+type CreateUserDraft = Omit<CreateSystemUserRequest, 'confirmation'>;
+
 interface UserFormDialogProps {
   open: boolean;
   user?: SystemUser | null;
   loading?: boolean;
   error?: string | null;
   onClose: () => void;
-  onSubmit: (
-    data: CreateSystemUserRequest | UpdateSystemUserRequest,
-  ) => void;
+  onSubmit: (data: CreateUserDraft | UpdateSystemUserRequest) => void;
 }
 
 interface UserFormValues {
   name: string;
   email: string;
-  password: string;
-  confirmPassword: string;
+  phone: string;
   role: UserRole;
 }
 
 const roleDescriptions: Record<UserRole, string> = {
   ADMIN: 'Acceso total, usuarios, costos, reportes y configuración.',
-  VENDEDOR: 'Ventas, clientes, inventario y consultas operativas.',
-  COBRADOR: 'Cobranzas, pagos, deudas y consultas permitidas.',
+  VENDEDOR: 'Consulta todas las ventas y opera únicamente sus ventas propias.',
+  COBRADOR: 'Acceso a cobranzas, ventas y pagos que tenga asignados.',
 };
 
 export function UserFormDialog({
@@ -57,41 +57,40 @@ export function UserFormDialog({
   onSubmit,
 }: UserFormDialogProps) {
   const isEditing = Boolean(user);
-
   const {
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors },
   } = useForm<UserFormValues>({
     defaultValues: {
-      name: user?.name ?? '',
-      email: user?.email ?? '',
-      password: '',
-      confirmPassword: '',
-      role: user?.role ?? 'VENDEDOR',
+      name: '',
+      email: '',
+      phone: '',
+      role: 'VENDEDOR',
     },
   });
 
-  const selectedRole =
-    useWatch({ control, name: 'role' }) ?? 'VENDEDOR';
-  const password = useWatch({ control, name: 'password' });
+  useEffect(() => {
+    if (open) {
+      reset({
+        name: user?.name ?? '',
+        email: user?.email ?? '',
+        phone: user?.phone ?? '',
+        role: user?.role ?? 'VENDEDOR',
+      });
+    }
+  }, [open, reset, user]);
+
+  const selectedRole = useWatch({ control, name: 'role' }) ?? 'VENDEDOR';
 
   const submitForm = (values: UserFormValues) => {
-    const commonData = {
+    onSubmit({
       name: values.name.trim(),
       email: values.email.trim().toLowerCase(),
+      phone: values.phone.trim(),
       role: values.role,
-    };
-
-    if (isEditing) {
-      onSubmit(commonData);
-      return;
-    }
-
-    onSubmit({
-      ...commonData,
-      password: values.password,
     });
   };
 
@@ -105,7 +104,6 @@ export function UserFormDialog({
       <DialogTitle>
         {isEditing ? 'Editar usuario' : 'Dar de alta un usuario'}
       </DialogTitle>
-
       <Box component="form" onSubmit={handleSubmit(submitForm)}>
         <DialogContent dividers>
           {error && (
@@ -113,7 +111,6 @@ export function UserFormDialog({
               {error}
             </Alert>
           )}
-
           <Stack spacing={2}>
             <TextField
               fullWidth
@@ -129,7 +126,6 @@ export function UserFormDialog({
                 },
               })}
             />
-
             <TextField
               fullWidth
               type="email"
@@ -144,46 +140,18 @@ export function UserFormDialog({
                 },
               })}
             />
-
-            {!isEditing && (
-              <>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Contraseña temporal"
-                  error={Boolean(errors.password)}
-                  helperText={
-                    errors.password?.message ??
-                    'Debe tener entre 8 y 72 caracteres.'
-                  }
-                  {...register('password', {
-                    required: 'La contraseña es obligatoria',
-                    minLength: {
-                      value: 8,
-                      message: 'Debe tener al menos 8 caracteres',
-                    },
-                    maxLength: {
-                      value: 72,
-                      message: 'No debe superar 72 caracteres',
-                    },
-                  })}
-                />
-
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Confirmar contraseña"
-                  error={Boolean(errors.confirmPassword)}
-                  helperText={errors.confirmPassword?.message}
-                  {...register('confirmPassword', {
-                    required: 'Confirma la contraseña',
-                    validate: (value) =>
-                      value === password || 'Las contraseñas no coinciden',
-                  })}
-                />
-              </>
-            )}
-
+            <TextField
+              fullWidth
+              label="Teléfono"
+              error={Boolean(errors.phone)}
+              helperText={errors.phone?.message ?? 'Opcional.'}
+              {...register('phone', {
+                maxLength: {
+                  value: 30,
+                  message: 'No debe superar 30 caracteres',
+                },
+              })}
+            />
             <FormControl fullWidth error={Boolean(errors.role)}>
               <InputLabel id="user-role-label">Rol del sistema</InputLabel>
               <Select
@@ -203,22 +171,29 @@ export function UserFormDialog({
               </FormHelperText>
             </FormControl>
 
+            {!isEditing && (
+              <Alert severity="info">
+                El servidor generará una contraseña temporal segura. Solo se
+                mostrará una vez y deberá cambiarse en el primer acceso.
+              </Alert>
+            )}
+
             {selectedRole === 'ADMIN' && (
               <Alert severity="warning">
-                Este rol podrá administrar usuarios y acceder a toda la
-                información del sistema.
+                Este rol permite administrar usuarios, costos, reportes y
+                operaciones críticas. La creación o asignación se confirmará
+                con tu contraseña y segundo factor.
               </Alert>
             )}
 
             {isEditing && (
               <Typography variant="body2" color="text.secondary">
-                La contraseña se restablece desde la acción independiente de
-                seguridad.
+                Cambiar el correo o el rol cerrará todas las sesiones del
+                usuario y requerirá confirmación reforzada.
               </Typography>
             )}
           </Stack>
         </DialogContent>
-
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={onClose} disabled={loading}>
             Cancelar
@@ -227,7 +202,7 @@ export function UserFormDialog({
             {loading
               ? 'Guardando...'
               : isEditing
-                ? 'Guardar cambios'
+                ? 'Continuar'
                 : 'Crear usuario'}
           </Button>
         </DialogActions>
