@@ -1,23 +1,9 @@
 import type { ClientType } from './client.types';
 
-export type SaleStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'CANCELLED';
-
-export type PaymentStatus =
-  | 'PENDING'
-  | 'PARTIALLY_PAID'
-  | 'PAID';
-
-export type SaleType =
-  | 'CASH'
-  | 'CREDIT';
-
-export type PaymentMethod =
-  | 'CASH'
-  | 'QR'
-  | 'BANK_TRANSFER';
+export type SaleStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+export type PaymentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID';
+export type SaleType = 'CASH' | 'CREDIT';
+export type PaymentMethod = 'CASH' | 'QR' | 'BANK_TRANSFER';
 
 export interface SaleDetail {
   id: string;
@@ -34,7 +20,6 @@ export interface SaleDetail {
 export interface Sale {
   id: string;
   saleNumber: string;
-
   clientId: string;
   clientName: string;
   clientAlias?: string | null;
@@ -42,31 +27,25 @@ export interface Sale {
   clientLocation?: string | null;
   clientPhone?: string | null;
   clientWhatsAppConsent: boolean;
-
   userId: number;
   userName: string;
-
   date: string;
   status: SaleStatus;
   paymentStatus: PaymentStatus;
   saleType: SaleType;
   dueDate?: string | null;
-
   subtotal: number;
   discount: number;
   total: number;
   paidAmount: number;
   balance: number;
-
   observations?: string | null;
   pdfUrl?: string | null;
   cancelledPdfUrl?: string | null;
   whatsappLastSentAt?: string | null;
   whatsappMessageId?: string | null;
   whatsappLastError?: string | null;
-
   details: SaleDetail[];
-
   createdAt?: string;
   updatedAt?: string;
 }
@@ -105,7 +84,7 @@ export interface SaleReturnDetailRequest {
 
 export interface CreateSaleReturnRequest {
   details: SaleReturnDetailRequest[];
-  observations?: string;
+  observations: string;
 }
 
 export interface SaleReturnResponse {
@@ -113,10 +92,10 @@ export interface SaleReturnResponse {
   return: {
     id: string;
     saleId: string;
-    userId: number;
+    userId?: number;
     amount: number;
     observations?: string | null;
-    createdAt: string;
+    createdAt?: string;
   };
   sale: Sale;
 }
