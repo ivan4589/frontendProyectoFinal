@@ -22,50 +22,176 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Apply financial scope UI
+      - name: Apply final dashboard scope
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('src/features/sales/SalesPage.tsx')
+          path = Path('src/features/dashboard/DashboardPage.tsx')
           text = path.read_text(encoding='utf-8')
 
           def replace_once(old: str, new: str):
               global text
               if old not in text:
-                  raise SystemExit(f'No se encontró el bloque esperado: {old[:100]!r}')
+                  raise SystemExit(f'No se encontró el bloque esperado: {old[:120]!r}')
               text = text.replace(old, new, 1)
 
           replace_once(
-              """  const canManageOwnSale = (sale: Sale) =>\n    isAdmin ||\n    (user?.role === 'VENDEDOR' && sale.userId === user?.id);""",
-              """  const canManageOwnSale = (sale: Sale) =>\n    isAdmin ||\n    (user?.role === 'VENDEDOR' && sale.userId === user?.id);\n  const canViewSaleFinancials = (sale: Sale) =>\n    isAdmin ||\n    user?.role === 'COBRADOR' ||\n    sale.userId === user?.id;""",
+              """  const paymentsQuery = useQuery({
+    queryKey: ['dashboard', 'payments', filters],
+    queryFn: () => getPaymentMethods(filters),
+  });""",
+              """  const paymentsQuery = useQuery({
+    queryKey: ['dashboard', 'payments', filters],
+    queryFn: () => getPaymentMethods(filters),
+    enabled: isAdmin,
+  });""",
           )
           replace_once(
-              """                  const paymentStyle =\n                    getPaymentStatusStyle(\n                      sale.paymentStatus,\n                    );""",
-              """                  const canViewFinancials =\n                    canViewSaleFinancials(sale);\n\n                  const paymentStyle = canViewFinancials\n                    ? getPaymentStatusStyle(sale.paymentStatus)\n                    : null;""",
+              """  const debtAlertsQuery = useQuery({
+    queryKey: ['dashboard', 'debt-alerts'],
+    queryFn: () => getDebtAlerts({}),
+  });""",
+              """  const debtAlertsQuery = useQuery({
+    queryKey: ['dashboard', 'debt-alerts'],
+    queryFn: () => getDebtAlerts({}),
+    enabled: isAdmin,
+  });""",
           )
           replace_once(
-              """                        <TableCell>\n                          <Chip\n                            size=\"small\"\n                            label={getPaymentStatusLabel(\n                              sale.paymentStatus,\n                            )}\n                            sx={{\n                              bgcolor:\n                                paymentStyle.backgroundColor,\n                              color:\n                                paymentStyle.color,\n                              fontWeight: 800,\n                            }}\n                          />\n                        </TableCell>""",
-              """                        <TableCell>\n                          {canViewFinancials && paymentStyle ? (\n                            <Chip\n                              size=\"small\"\n                              label={getPaymentStatusLabel(sale.paymentStatus)}\n                              sx={{\n                                bgcolor: paymentStyle.backgroundColor,\n                                color: paymentStyle.color,\n                                fontWeight: 800,\n                              }}\n                            />\n                          ) : (\n                            <Chip\n                              size=\"small\"\n                              label=\"Restringido\"\n                              variant=\"outlined\"\n                            />\n                          )}\n                        </TableCell>""",
+              """            <KpiCard
+              title=\"Cobrado hoy\"
+              value={formatCurrency(kpi?.collectionToday)}
+              subtitle={`Periodo de pagos: ${periodDays} días`}
+              icon={<AccountBalanceWallet />}
+              color=\"#1976d2\"
+            />
+            <KpiCard
+              title=\"Cuentas por cobrar\"
+              value={formatCurrency(kpi?.totalDebt)}
+              subtitle={`${kpi?.overdueAccounts ?? 0} cuentas vencidas`}
+              icon={<AttachMoney />}
+              color=\"#ed6c02\"
+            />""",
+              """            {isAdmin && (
+              <KpiCard
+                title=\"Cobrado hoy\"
+                value={formatCurrency(kpi?.collectionToday)}
+                subtitle={`Periodo de pagos: ${periodDays} días`}
+                icon={<AccountBalanceWallet />}
+                color=\"#1976d2\"
+              />
+            )}
+            {isAdmin && (
+              <KpiCard
+                title=\"Cuentas por cobrar\"
+                value={formatCurrency(kpi?.totalDebt)}
+                subtitle={`${kpi?.overdueAccounts ?? 0} cuentas vencidas`}
+                icon={<AttachMoney />}
+                color=\"#ed6c02\"
+              />
+            )}""",
           )
           replace_once(
-              """                          {sale.balance > 0 && (""",
-              """                          {canViewFinancials && sale.balance > 0 && (""",
-          )
-          paid_block = """                                <Paper\n                                  variant=\"outlined\"\n                                  sx={{ p: 1.5 }}\n                                >\n                                  <Typography variant=\"caption\">\n                                    Pagado\n                                  </Typography>\n\n                                  <Typography\n                                    fontWeight={800}\n                                    color=\"success.main\"\n                                  >\n                                    {formatCurrency(\n                                      sale.paidAmount,\n                                    )}\n                                  </Typography>\n                                </Paper>"""
-          replace_once(
-              paid_block,
-              """                                {canViewFinancials && (\n                                  <Paper\n                                    variant=\"outlined\"\n                                    sx={{ p: 1.5 }}\n                                  >\n                                    <Typography variant=\"caption\">\n                                      Pagado\n                                    </Typography>\n                                    <Typography fontWeight={800} color=\"success.main\">\n                                      {formatCurrency(sale.paidAmount)}\n                                    </Typography>\n                                  </Paper>\n                                )}""",
-          )
-          balance_block = """                                <Paper\n                                  variant=\"outlined\"\n                                  sx={{ p: 1.5 }}\n                                >\n                                  <Typography variant=\"caption\">\n                                    Saldo\n                                  </Typography>\n\n                                  <Typography\n                                    fontWeight={800}\n                                    color={\n                                      sale.balance >\n                                      0\n                                        ? 'error.main'\n                                        : 'success.main'\n                                    }\n                                  >\n                                    {formatCurrency(\n                                      sale.balance,\n                                    )}\n                                  </Typography>\n                                </Paper>"""
-          replace_once(
-              balance_block,
-              """                                {canViewFinancials && (\n                                  <Paper\n                                    variant=\"outlined\"\n                                    sx={{ p: 1.5 }}\n                                  >\n                                    <Typography variant=\"caption\">\n                                      Saldo\n                                    </Typography>\n                                    <Typography\n                                      fontWeight={800}\n                                      color={sale.balance > 0 ? 'error.main' : 'success.main'}\n                                    >\n                                      {formatCurrency(sale.balance)}\n                                    </Typography>\n                                  </Paper>\n                                )}""",
+              """            lg: canSeeSales ? 'minmax(0, 2fr) minmax(320px, 1fr)' : '1fr',""",
+              """            lg: isAdmin ? 'minmax(0, 2fr) minmax(320px, 1fr)' : '1fr',""",
           )
           replace_once(
-              """      {user?.role === 'COBRADOR' && (""",
-              """      {user?.role === 'VENDEDOR' && (\n        <Alert severity=\"info\" sx={{ mb: 2 }}>\n          Puedes consultar y descargar todas las ventas. Los saldos y pagos\n          solo se muestran en las ventas registradas por tu usuario.\n        </Alert>\n      )}\n\n      {user?.role === 'COBRADOR' && (""",
+              """        <Section
+          title=\"Cobros por método\"""",
+              """        {isAdmin && (
+          <Section
+            title=\"Cobros por método\"""",
+          )
+          replace_once(
+              """        </Section>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },""",
+              """          </Section>
+        )}
+      </Box>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },""",
+          )
+          replace_once(
+              """        <Section
+          title=\"Alertas de cobranza\"""",
+              """        {isAdmin && (
+          <Section
+            title=\"Alertas de cobranza\"""",
+          )
+          replace_once(
+              """        </Section>
+
+        <Section
+          title=\"Alertas de stock Central\"""",
+              """          </Section>
+        )}
+
+        <Section
+          title=\"Alertas de stock Central\"""",
+          )
+          replace_once(
+              """                  <TableCell>Estado de pago</TableCell>
+                  <TableCell align=\"right\">Total</TableCell>
+                  <TableCell align=\"right\">Saldo</TableCell>""",
+              """                  {isAdmin && <TableCell>Estado de pago</TableCell>}
+                  <TableCell align=\"right\">Total</TableCell>
+                  {isAdmin && <TableCell align=\"right\">Saldo</TableCell>}""",
+          )
+          replace_once(
+              """                    <TableCell>
+                      <Chip
+                        size=\"small\"
+                        label={
+                          paymentStatusLabels[sale.paymentStatus] ??
+                          sale.paymentStatus
+                        }
+                        color={
+                          sale.paymentStatus === 'PAID'
+                            ? 'success'
+                            : sale.paymentStatus === 'PARTIALLY_PAID'
+                              ? 'warning'
+                              : 'default'
+                        }
+                      />
+                    </TableCell>""",
+              """                    {isAdmin && (
+                      <TableCell>
+                        <Chip
+                          size=\"small\"
+                          label={
+                            paymentStatusLabels[sale.paymentStatus] ??
+                            sale.paymentStatus
+                          }
+                          color={
+                            sale.paymentStatus === 'PAID'
+                              ? 'success'
+                              : sale.paymentStatus === 'PARTIALLY_PAID'
+                                ? 'warning'
+                                : 'default'
+                          }
+                        />
+                      </TableCell>
+                    )}""",
+          )
+          replace_once(
+              """                    <TableCell align=\"right\">
+                      {formatCurrency(sale.balance)}
+                    </TableCell>""",
+              """                    {isAdmin && (
+                      <TableCell align=\"right\">
+                        {formatCurrency(sale.balance)}
+                      </TableCell>
+                    )}""",
           )
 
           path.write_text(text, encoding='utf-8')
@@ -80,12 +206,12 @@ jobs:
         shell: bash
         run: |
           {
-            echo "RBAC_UI_FINANCIAL_BUILD_OUTCOME=${{ steps.build.outcome }}"
+            echo "RBAC_UI_FINAL_BUILD_OUTCOME=${{ steps.build.outcome }}"
             echo "Validated at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > .github/rbac-ui-financial-validation.txt
+          } > .github/rbac-ui-final-validation.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src .github/rbac-ui-financial-validation.txt
-          git commit -m "Oculta saldos ajenos en la interfaz de ventas"
+          git add src/features/dashboard/DashboardPage.tsx .github/rbac-ui-final-validation.txt
+          git commit -m "Restringe métricas financieras del dashboard"
           git push origin HEAD:agent/roles-permisos-alcance-datos
           test "${{ steps.build.outcome }}" = "success"
