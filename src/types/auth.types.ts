@@ -12,6 +12,7 @@ export interface AuthUser {
   role?: UserRole;
   status?: string;
   twoFactorEnabled?: boolean;
+  mustChangePassword?: boolean;
   emailVerifiedAt?: string | null;
   lastLoginAt?: string | null;
 }
@@ -65,6 +66,7 @@ export interface DecodedToken {
   name?: string;
   role?: UserRole;
   securityVersion?: number;
+  mustChangePassword?: boolean;
   exp?: number;
   iat?: number;
 }
