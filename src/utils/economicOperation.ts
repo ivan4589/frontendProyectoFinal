@@ -16,7 +16,11 @@ export function requestEconomicReason(action: string): string | null {
     return null;
   }
 
-  return reason;
+  const confirmed = window.confirm(
+    `Confirma la operación económica:\n\nAcción: ${action}\nMotivo: ${reason}\n\nEsta acción quedará registrada en la auditoría.`,
+  );
+
+  return confirmed ? reason : null;
 }
 
 export function requestInventoryQuantityChange(): number | null {
