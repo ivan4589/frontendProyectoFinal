@@ -6,7 +6,6 @@ import type {
 
 export async function getWarehouseTransfers(): Promise<WarehouseTransfer[]> {
   const response = await api.get<WarehouseTransfer[]>('/warehouse-transfers');
-
   return Array.isArray(response.data) ? response.data : [];
 }
 
@@ -17,16 +16,16 @@ export async function createWarehouseTransfer(
     '/warehouse-transfers',
     data,
   );
-
   return response.data;
 }
 
 export async function cancelWarehouseTransfer(
   id: string,
+  reason: string,
 ): Promise<WarehouseTransfer> {
   const response = await api.patch<WarehouseTransfer>(
     `/warehouse-transfers/${id}/cancel`,
+    { reason },
   );
-
   return response.data;
 }
