@@ -47,6 +47,7 @@ import { Loading } from '../../components/common/Loading';
 import type { WarehouseTransfer } from '../../types/warehouse-transfer.types';
 import type { WarehouseStock } from '../../types/warehouse.types';
 import { formatDateTime } from '../../utils/formatDate';
+import { requestEconomicReason } from '../../utils/economicOperation';
 
 interface TransferDetailDraft {
   key: string;
@@ -200,7 +201,8 @@ export function WarehouseTransfersPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: cancelWarehouseTransfer,
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      cancelWarehouseTransfer(id, reason),
     onSuccess: async () => {
       setTransferToCancel(null);
       setActionError(null);
@@ -837,7 +839,12 @@ export function WarehouseTransfersPage() {
             variant="contained"
             onClick={() => {
               if (transferToCancel) {
-                cancelMutation.mutate(transferToCancel.id);
+                const reason = requestEconomicReason(
+                  `anular la transferencia ${transferToCancel.transferNumber}`,
+                );
+                if (reason) {
+                  cancelMutation.mutate({ id: transferToCancel.id, reason });
+                }
               }
             }}
             disabled={cancelMutation.isPending}

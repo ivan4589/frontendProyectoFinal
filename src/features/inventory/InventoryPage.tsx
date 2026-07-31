@@ -24,13 +24,16 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import WarehouseIcon from '@mui/icons-material/Warehouse';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  adjustInventory,
   generateCentralInventoryPdf,
   getCentralInventory,
 } from '../../api/inventory.api';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { Loading } from '../../components/common/Loading';
+import { useAuth } from '../auth/AuthContext';
+import { requestEconomicReason, requestInventoryQuantityChange } from '../../utils/economicOperation';
 
 function getErrorMessage(error: unknown) {
   const requestError = error as {
@@ -77,6 +80,9 @@ function openPdf(pdfUrl: string) {
 }
 
 export function InventoryPage() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const inventoryQuery = useQuery({
     queryKey: ['inventory', 'central'],
     queryFn: getCentralInventory,
@@ -85,6 +91,25 @@ export function InventoryPage() {
     mutationFn: generateCentralInventoryPdf,
     onSuccess: (result) => openPdf(result.pdfUrl),
   });
+  const adjustmentMutation = useMutation({
+    mutationFn: adjustInventory,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['warehouses'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+    },
+  });
+
+  const handleAdjustment = (warehouseId: string, productId: string, name: string) => {
+    const quantityChange = requestInventoryQuantityChange();
+    if (quantityChange === null) return;
+    const reason = requestEconomicReason(`ajustar el inventario de ${name}`);
+    if (!reason) return;
+    adjustmentMutation.mutate({ warehouseId, productId, quantityChange, reason });
+  };
 
   if (inventoryQuery.isLoading) {
     return (
@@ -180,6 +205,11 @@ export function InventoryPage() {
       {pdfMutation.isError && (
         <Alert severity="error">
           {getErrorMessage(pdfMutation.error)}
+        </Alert>
+      )}
+      {adjustmentMutation.isError && (
+        <Alert severity="error">
+          {getErrorMessage(adjustmentMutation.error)}
         </Alert>
       )}
 
@@ -363,6 +393,7 @@ export function InventoryPage() {
                                   <TableCell align="right">
                                     Disponible
                                   </TableCell>
+                                  <TableCell align="right">Acción</TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
@@ -397,18 +428,29 @@ export function InventoryPage() {
                                       </TableCell>
                                       <TableCell align="right">
                                         <Chip
-                                          color={
-                                            product.availableStock >
-                                            0
-                                              ? 'success'
-                                              : 'default'
-                                          }
-                                          label={formatQuantity(
-                                            product.availableStock,
-                                          )}
+                                          color={product.availableStock > 0 ? 'success' : 'default'}
+                                          label={formatQuantity(product.availableStock)}
                                           size="small"
                                           variant="outlined"
                                         />
+                                      </TableCell>
+                                      <TableCell align="right">
+                                        {isAdmin ? (
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={adjustmentMutation.isPending}
+                                            onClick={() =>
+                                              handleAdjustment(
+                                                inventory.warehouse.id,
+                                                product.productId,
+                                                product.name,
+                                              )
+                                            }
+                                          >
+                                            Ajustar
+                                          </Button>
+                                        ) : '—'}
                                       </TableCell>
                                     </TableRow>
                                   ),
@@ -450,14 +492,11 @@ export function InventoryPage() {
                                   </TableCell>
                                   <TableCell
                                     align="right"
-                                    sx={{
-                                      fontWeight: 800,
-                                    }}
+                                    sx={{ fontWeight: 800 }}
                                   >
-                                    {formatQuantity(
-                                      category.totalAvailableStock,
-                                    )}
+                                    {formatQuantity(category.totalAvailableStock)}
                                   </TableCell>
+                                  <TableCell />
                                 </TableRow>
                               </TableBody>
                             </Table>

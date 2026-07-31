@@ -59,6 +59,8 @@ import type {
 import type { PaymentMethod } from '../../types/sale.types';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
+import { requestEconomicReason } from '../../utils/economicOperation';
+import { PaymentReversalsPanel } from './PaymentReversalsPanel';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
@@ -176,12 +178,15 @@ export function CollectionsPage() {
     mutationFn: async ({
       saleId,
       assignedToId,
+      reason,
     }: {
       saleId: string;
       assignedToId: number | null;
+      reason?: string;
     }) => {
       if (assignedToId === null) {
-        return unassignCollection(saleId);
+        if (!reason) throw new Error('Debes indicar el motivo de la desasignación.');
+        return unassignCollection(saleId, reason);
       }
 
       return assignCollection(
@@ -391,6 +396,14 @@ export function CollectionsPage() {
           paymentSelection.sale.balance,
         )}.`,
       );
+      return;
+    }
+
+    if (
+      paymentMethod !== 'CASH' &&
+      paymentReference.trim().length < 3
+    ) {
+      setActionError('Los pagos por QR o transferencia requieren una referencia.');
       return;
     }
 
@@ -912,18 +925,22 @@ export function CollectionsPage() {
                                     const value =
                                       event.target
                                         .value;
-                                    assignmentMutation.mutate(
-                                      {
-                                        saleId:
-                                          sale.id,
-                                        assignedToId:
-                                          value === ''
-                                            ? null
-                                            : Number(
-                                                value,
-                                              ),
-                                      },
-                                    );
+                                    if (value === '') {
+                                      const reason = requestEconomicReason(
+                                        `quitar la asignación de la venta ${sale.saleNumber}`,
+                                      );
+                                      if (!reason) return;
+                                      assignmentMutation.mutate({
+                                        saleId: sale.id,
+                                        assignedToId: null,
+                                        reason,
+                                      });
+                                      return;
+                                    }
+                                    assignmentMutation.mutate({
+                                      saleId: sale.id,
+                                      assignedToId: Number(value),
+                                    });
                                   }}
                                 >
                                   <MenuItem value="">
@@ -1023,6 +1040,8 @@ export function CollectionsPage() {
         </Alert>
       )}
 
+      {isAdmin && <PaymentReversalsPanel />}
+
       <Dialog
         open={Boolean(paymentSelection)}
         onClose={
@@ -1118,7 +1137,12 @@ export function CollectionsPage() {
                     event.target.value,
                   )
                 }
-                helperText="Opcional. Ej.: número de transferencia o comprobante."
+                required={paymentMethod !== 'CASH'}
+                helperText={
+                  paymentMethod === 'CASH'
+                    ? 'Opcional para pagos en efectivo.'
+                    : 'Obligatorio: número de transferencia o comprobante.'
+                }
               />
 
               <TextField
