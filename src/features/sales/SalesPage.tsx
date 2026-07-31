@@ -66,6 +66,7 @@ import { ErrorMessage } from '../../components/common/ErrorMessage';
 import { Loading } from '../../components/common/Loading';
 
 import { useAuth } from '../auth/AuthContext';
+import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
 import { formatCurrency } from '../../utils/formatCurrency';
 import {
@@ -282,13 +283,20 @@ function isInsideDateRange(
 export function SalesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-
-  const canManageSales =
-    user?.role === 'ADMIN' ||
-    user?.role === 'VENDEDOR';
-
-  const isAdmin =
-    user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'ADMIN';
+  const canCreateSale = hasPermission(user?.role, PERMISSIONS.SALES_CREATE);
+  const canCancelSale = hasPermission(user?.role, PERMISSIONS.SALES_CANCEL);
+  const canDownloadAllSales = hasPermission(
+    user?.role,
+    PERMISSIONS.SALES_DOWNLOAD_ALL,
+  );
+  const canManageOwnSale = (sale: Sale) =>
+    isAdmin ||
+    (user?.role === 'VENDEDOR' && sale.userId === user?.id);
+  const canViewSaleFinancials = (sale: Sale) =>
+    isAdmin ||
+    user?.role === 'COBRADOR' ||
+    sale.userId === user?.id;
 
   const [search, setSearch] =
     useState('');
@@ -357,6 +365,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['clients'],
     queryFn: () => getClients(),
+    enabled: canCreateSale,
   });
 
   const {
@@ -367,6 +376,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['products'],
     queryFn: () => getProducts(),
+    enabled: canCreateSale,
   });
 
   const {
@@ -377,6 +387,7 @@ export function SalesPage() {
   } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
+    enabled: canCreateSale,
   });
 
   const {
@@ -388,6 +399,7 @@ export function SalesPage() {
     queryKey: ['sub-categories'],
     queryFn: () =>
       getSubCategories(),
+    enabled: canCreateSale,
   });
 
   const filteredSales = useMemo(() => {
@@ -774,10 +786,11 @@ export function SalesPage() {
 
   if (
     salesLoading ||
-    clientsLoading ||
-    productsLoading ||
-    categoriesLoading ||
-    subCategoriesLoading
+    (canCreateSale &&
+      (clientsLoading ||
+        productsLoading ||
+        categoriesLoading ||
+        subCategoriesLoading))
   ) {
     return (
       <Loading message="Cargando ventas..." />
@@ -794,7 +807,7 @@ export function SalesPage() {
     );
   }
 
-  if (clientsIsError) {
+  if (canCreateSale && clientsIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -804,7 +817,7 @@ export function SalesPage() {
     );
   }
 
-  if (productsIsError) {
+  if (canCreateSale && productsIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -814,7 +827,7 @@ export function SalesPage() {
     );
   }
 
-  if (categoriesIsError) {
+  if (canCreateSale && categoriesIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -824,7 +837,7 @@ export function SalesPage() {
     );
   }
 
-  if (subCategoriesIsError) {
+  if (canCreateSale && subCategoriesIsError) {
     return (
       <ErrorMessage
         message={getErrorMessage(
@@ -982,6 +995,13 @@ export function SalesPage() {
           </Typography>
         </Card>
       </Box>
+
+      {user?.role === 'VENDEDOR' && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Puedes consultar y descargar todas las ventas. Los saldos y pagos
+          solo se muestran en las ventas registradas por tu usuario.
+        </Alert>
+      )}
 
       {user?.role === 'COBRADOR' && (
         <Alert
@@ -1218,7 +1238,7 @@ export function SalesPage() {
               </Button>
             )}
 
-            {canManageSales && (
+            {canCreateSale && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
@@ -1289,17 +1309,18 @@ export function SalesPage() {
                       sale.status,
                     );
 
-                  const paymentStyle =
-                    getPaymentStatusStyle(
-                      sale.paymentStatus,
-                    );
+                  const canViewFinancials =
+                    canViewSaleFinancials(sale);
 
-                  const documentUrl =
-                    sale.status ===
-                      'CANCELLED' &&
-                    sale.cancelledPdfUrl
+                  const paymentStyle = canViewFinancials
+                    ? getPaymentStatusStyle(sale.paymentStatus)
+                    : null;
+
+                  const documentUrl = canDownloadAllSales
+                    ? sale.status === 'CANCELLED' && sale.cancelledPdfUrl
                       ? sale.cancelledPdfUrl
-                      : sale.pdfUrl;
+                      : sale.pdfUrl
+                    : undefined;
 
                   const whatsappDisabledReason =
                     !sale.clientPhone
@@ -1408,19 +1429,23 @@ export function SalesPage() {
                         </TableCell>
 
                         <TableCell>
-                          <Chip
-                            size="small"
-                            label={getPaymentStatusLabel(
-                              sale.paymentStatus,
-                            )}
-                            sx={{
-                              bgcolor:
-                                paymentStyle.backgroundColor,
-                              color:
-                                paymentStyle.color,
-                              fontWeight: 800,
-                            }}
-                          />
+                          {canViewFinancials && paymentStyle ? (
+                            <Chip
+                              size="small"
+                              label={getPaymentStatusLabel(sale.paymentStatus)}
+                              sx={{
+                                bgcolor: paymentStyle.backgroundColor,
+                                color: paymentStyle.color,
+                                fontWeight: 800,
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              size="small"
+                              label="Restringido"
+                              variant="outlined"
+                            />
+                          )}
                         </TableCell>
 
                         <TableCell>
@@ -1432,7 +1457,7 @@ export function SalesPage() {
                             )}
                           </Typography>
 
-                          {sale.balance > 0 && (
+                          {canViewFinancials && sale.balance > 0 && (
                             <Typography
                               variant="caption"
                               color="error.main"
@@ -1467,7 +1492,7 @@ export function SalesPage() {
                             </Tooltip>
                           )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'PENDING' && (
                               <>
@@ -1503,7 +1528,7 @@ export function SalesPage() {
                               </>
                             )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip title="Registrar devolución">
@@ -1521,7 +1546,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {canManageSales &&
+                          {canManageOwnSale(sale) &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip
@@ -1567,7 +1592,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {isAdmin &&
+                          {canCancelSale &&
                             sale.status !==
                               'CANCELLED' && (
                               <Tooltip title="Anular venta">
@@ -1648,46 +1673,36 @@ export function SalesPage() {
                                   </Typography>
                                 </Paper>
 
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 1.5 }}
-                                >
-                                  <Typography variant="caption">
-                                    Pagado
-                                  </Typography>
-
-                                  <Typography
-                                    fontWeight={800}
-                                    color="success.main"
+                                {canViewFinancials && (
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{ p: 1.5 }}
                                   >
-                                    {formatCurrency(
-                                      sale.paidAmount,
-                                    )}
-                                  </Typography>
-                                </Paper>
+                                    <Typography variant="caption">
+                                      Pagado
+                                    </Typography>
+                                    <Typography fontWeight={800} color="success.main">
+                                      {formatCurrency(sale.paidAmount)}
+                                    </Typography>
+                                  </Paper>
+                                )}
 
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 1.5 }}
-                                >
-                                  <Typography variant="caption">
-                                    Saldo
-                                  </Typography>
-
-                                  <Typography
-                                    fontWeight={800}
-                                    color={
-                                      sale.balance >
-                                      0
-                                        ? 'error.main'
-                                        : 'success.main'
-                                    }
+                                {canViewFinancials && (
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{ p: 1.5 }}
                                   >
-                                    {formatCurrency(
-                                      sale.balance,
-                                    )}
-                                  </Typography>
-                                </Paper>
+                                    <Typography variant="caption">
+                                      Saldo
+                                    </Typography>
+                                    <Typography
+                                      fontWeight={800}
+                                      color={sale.balance > 0 ? 'error.main' : 'success.main'}
+                                    >
+                                      {formatCurrency(sale.balance)}
+                                    </Typography>
+                                  </Paper>
+                                )}
                               </Box>
 
                               {sale.observations && (
