@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { AdministrationPage } from '../features/administration/AdministrationPage';
 import { RegistrationRequestsPage } from '../features/administration/RegistrationRequestsPage';
@@ -40,9 +40,14 @@ function LoadingSession() {
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { isAuthenticated, initializing } = useAuth();
+  const { isAuthenticated, initializing, user } = useAuth();
+  const location = useLocation();
   if (initializing) return <LoadingSession />;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.mustChangePassword && location.pathname !== '/security') {
+    return <Navigate to="/security?required=password" replace />;
+  }
+  return <>{children}</>;
 }
 
 function PublicOnly({ children }: { children: ReactNode }) {
@@ -68,6 +73,9 @@ function RequirePermission({
 
 function HomeRedirect() {
   const { user } = useAuth();
+  if (user?.mustChangePassword) {
+    return <Navigate to="/security?required=password" replace />;
+  }
   const destination = user?.role === 'COBRADOR' ? '/collections' : '/dashboard';
   return <Navigate to={destination} replace />;
 }

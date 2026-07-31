@@ -43,6 +43,7 @@ function getUserFromToken(token: string | null): AuthUser | null {
     name: decoded.name,
     email: decoded.email,
     role: decoded.role,
+    mustChangePassword: decoded.mustChangePassword === true,
   };
 }
 

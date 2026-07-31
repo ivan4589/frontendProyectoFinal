@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  Alert,
   AppBar,
   Avatar,
   Box,
@@ -44,54 +45,14 @@ type MenuItem = {
 };
 
 const menuItems: MenuItem[] = [
-  {
-    text: 'Dashboard',
-    path: '/dashboard',
-    icon: <DashboardIcon />,
-    permissions: [PERMISSIONS.DASHBOARD_VIEW],
-  },
-  {
-    text: 'Clientes',
-    path: '/clients',
-    icon: <PeopleIcon />,
-    permissions: [PERMISSIONS.CLIENTS_VIEW],
-  },
-  {
-    text: 'Proveedores',
-    path: '/providers',
-    icon: <LocalShippingIcon />,
-    permissions: [PERMISSIONS.PROVIDERS_VIEW],
-  },
-  {
-    text: 'Productos',
-    path: '/products',
-    icon: <InventoryIcon />,
-    permissions: [PERMISSIONS.PRODUCTS_VIEW],
-  },
-  {
-    text: 'Inventario',
-    path: '/inventory',
-    icon: <Inventory2Icon />,
-    permissions: [PERMISSIONS.INVENTORY_VIEW],
-  },
-  {
-    text: 'Compras',
-    path: '/purchases',
-    icon: <ShoppingCartIcon />,
-    permissions: [PERMISSIONS.PURCHASES_VIEW],
-  },
-  {
-    text: 'Transferencias',
-    path: '/warehouse-transfers',
-    icon: <SwapHorizIcon />,
-    permissions: [PERMISSIONS.INVENTORY_TRANSFER],
-  },
-  {
-    text: 'Ventas',
-    path: '/sales',
-    icon: <ReceiptIcon />,
-    permissions: [PERMISSIONS.SALES_VIEW_ALL, PERMISSIONS.SALES_VIEW_ASSIGNED],
-  },
+  { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon />, permissions: [PERMISSIONS.DASHBOARD_VIEW] },
+  { text: 'Clientes', path: '/clients', icon: <PeopleIcon />, permissions: [PERMISSIONS.CLIENTS_VIEW] },
+  { text: 'Proveedores', path: '/providers', icon: <LocalShippingIcon />, permissions: [PERMISSIONS.PROVIDERS_VIEW] },
+  { text: 'Productos', path: '/products', icon: <InventoryIcon />, permissions: [PERMISSIONS.PRODUCTS_VIEW] },
+  { text: 'Inventario', path: '/inventory', icon: <Inventory2Icon />, permissions: [PERMISSIONS.INVENTORY_VIEW] },
+  { text: 'Compras', path: '/purchases', icon: <ShoppingCartIcon />, permissions: [PERMISSIONS.PURCHASES_VIEW] },
+  { text: 'Transferencias', path: '/warehouse-transfers', icon: <SwapHorizIcon />, permissions: [PERMISSIONS.INVENTORY_TRANSFER] },
+  { text: 'Ventas', path: '/sales', icon: <ReceiptIcon />, permissions: [PERMISSIONS.SALES_VIEW_ALL, PERMISSIONS.SALES_VIEW_ASSIGNED] },
   {
     text: 'Cobranza',
     path: '/collections',
@@ -106,24 +67,10 @@ const menuItems: MenuItem[] = [
     text: 'Reportes',
     path: '/reports',
     icon: <AssessmentIcon />,
-    permissions: [
-      PERMISSIONS.REPORTS_FINANCIAL,
-      PERMISSIONS.REPORTS_SALES_ALL,
-      PERMISSIONS.REPORTS_INVENTORY,
-    ],
+    permissions: [PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_INVENTORY],
   },
-  {
-    text: 'Mi seguridad',
-    path: '/security',
-    icon: <SecurityIcon />,
-    permissions: [PERMISSIONS.SECURITY_SELF_MANAGE],
-  },
-  {
-    text: 'Administración',
-    path: '/administration',
-    icon: <AdminPanelSettingsIcon />,
-    permissions: [PERMISSIONS.USERS_MANAGE],
-  },
+  { text: 'Mi seguridad', path: '/security', icon: <SecurityIcon />, permissions: [PERMISSIONS.SECURITY_SELF_MANAGE] },
+  { text: 'Administración', path: '/administration', icon: <AdminPanelSettingsIcon />, permissions: [PERMISSIONS.USERS_MANAGE] },
 ];
 
 export function MainLayout() {
@@ -136,18 +83,16 @@ export function MainLayout() {
   };
 
   const userLabel = user?.name || user?.email || 'Usuario';
-  const visibleMenuItems = menuItems.filter((item) =>
-    hasAnyPermission(user?.role, item.permissions),
-  );
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (user?.mustChangePassword) return item.path === '/security';
+    return hasAnyPermission(user?.role, item.permissions);
+  });
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar
         position="fixed"
-        sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: '#063f2d',
-        }}
+        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, backgroundColor: '#063f2d' }}
       >
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -158,20 +103,10 @@ export function MainLayout() {
               {userLabel.charAt(0).toUpperCase()}
             </Avatar>
             <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-              <Typography variant="body2" sx={{ lineHeight: 1.1 }}>
-                {userLabel}
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                {user?.role || 'Sin rol'}
-              </Typography>
+              <Typography variant="body2" sx={{ lineHeight: 1.1 }}>{userLabel}</Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>{user?.role || 'Sin rol'}</Typography>
             </Box>
-            <Button
-              color="inherit"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-            >
-              Salir
-            </Button>
+            <Button color="inherit" startIcon={<LogoutIcon />} onClick={handleLogout}>Salir</Button>
           </Box>
         </Toolbar>
       </AppBar>
@@ -196,13 +131,15 @@ export function MainLayout() {
             alt="Yungas Distribuidora"
             sx={{ width: 70, height: 70, objectFit: 'contain', mb: 1 }}
           />
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Yungas Distribuidora
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Ventas e Inventarios
-          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Yungas Distribuidora</Typography>
+          <Typography variant="caption" color="text.secondary">Ventas e Inventarios</Typography>
         </Box>
+
+        {user?.mustChangePassword && (
+          <Alert severity="warning" sx={{ mx: 1.5, mb: 1 }}>
+            Cambia la contraseña temporal para habilitar los módulos.
+          </Alert>
+        )}
 
         <Box sx={{ overflow: 'auto', mt: 1 }}>
           <List>
@@ -229,18 +166,9 @@ export function MainLayout() {
         </Box>
       </Drawer>
 
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          minHeight: '100vh',
-          backgroundColor: 'background.default',
-        }}
-      >
+      <Box component="main" sx={{ flexGrow: 1, minHeight: '100vh', backgroundColor: 'background.default' }}>
         <Toolbar />
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          <Outlet />
-        </Container>
+        <Container maxWidth="xl" sx={{ py: 3 }}><Outlet /></Container>
       </Box>
     </Box>
   );
