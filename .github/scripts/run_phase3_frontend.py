@@ -1,6 +1,14 @@
 from pathlib import Path
 
 
+def replace_required(path: str, old: str, new: str) -> None:
+    target = Path(path)
+    text = target.read_text(encoding='utf-8')
+    if old not in text:
+        raise RuntimeError(f'No se encontró el ajuste esperado en {path}: {old!r}')
+    target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+
 def main() -> None:
     if Path('src/api/documents.api.ts').exists():
         print('Phase 3 frontend already applied')
@@ -66,6 +74,22 @@ def main() -> None:
     )
 
     exec(compile(script, 'phase3_frontend.py', 'exec'))
+
+    replace_required(
+        'src/types/product.types.ts',
+        '  purchasePrice?: number;',
+        '  purchasePrice: number;',
+    )
+    replace_required(
+        'src/features/products/ProductsPage.tsx',
+        '        data: { ...data, changeReason },',
+        '        data: { ...data, changeReason: changeReason || undefined },',
+    )
+    replace_required(
+        'src/features/purchases/PurchasesPage.tsx',
+        '    queryFn: getProviders,',
+        '    queryFn: () => getProviders(),',
+    )
 
 
 if __name__ == '__main__':
