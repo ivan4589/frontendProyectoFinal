@@ -84,6 +84,120 @@ def main() -> None:
                         </Typography>''',
     )
 
+    replace_once(
+        'src/features/inventory/InventoryPage.tsx',
+        "import { ErrorMessage } from '../../components/common/ErrorMessage';",
+        "import { ErrorMessage } from '../../components/common/ErrorMessage';\nimport { downloadProtectedDocument } from '../../api/documents.api';",
+    )
+    replace_once(
+        'src/features/inventory/InventoryPage.tsx',
+        '''function openPdf(pdfUrl: string) {
+  const absoluteUrl =
+    pdfUrl.startsWith('http://') ||
+    pdfUrl.startsWith('https://')
+      ? pdfUrl
+      : `${
+          import.meta.env.VITE_API_URL ||
+          'http://localhost:3000'
+        }${pdfUrl}`;
+
+  window.open(
+    absoluteUrl,
+    '_blank',
+    'noopener,noreferrer',
+  );
+}
+
+''',
+        '',
+    )
+    replace_once(
+        'src/features/inventory/InventoryPage.tsx',
+        '''  const pdfMutation = useMutation({
+    mutationFn: generateCentralInventoryPdf,
+    onSuccess: (result) => openPdf(result.pdfUrl),
+  });''',
+        '''  const pdfMutation = useMutation({
+    mutationFn: async () => {
+      const result = await generateCentralInventoryPdf();
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        'inventario-central.pdf',
+      );
+    },
+  });''',
+    )
+
+    replace_once(
+        'src/features/collections/CollectionsPage.tsx',
+        "import { ErrorMessage } from '../../components/common/ErrorMessage';",
+        "import { ErrorMessage } from '../../components/common/ErrorMessage';\nimport { downloadProtectedDocument } from '../../api/documents.api';",
+    )
+    replace_once(
+        'src/features/collections/CollectionsPage.tsx',
+        '''function openPdf(pdfUrl: string) {
+  const absoluteUrl =
+    pdfUrl.startsWith('http://') ||
+    pdfUrl.startsWith('https://')
+      ? pdfUrl
+      : `${
+          import.meta.env.VITE_API_URL ||
+          'http://localhost:3000'
+        }${pdfUrl}`;
+
+  window.open(absoluteUrl, '_blank', 'noopener,noreferrer');
+}
+
+''',
+        '',
+    )
+    replace_once(
+        'src/features/collections/CollectionsPage.tsx',
+        '''      if (kind === 'GENERAL') {
+        return generateGeneralDebtPdf();
+      }
+
+      if (kind === 'ASSIGNMENTS') {
+        return generateAssignmentsPdf();
+      }
+
+      if (!userId) {
+        throw new Error(
+          'No se encontró el usuario del reporte.',
+        );
+      }
+
+      return generateUserAssignmentsPdf(userId);
+    },
+    onSuccess: (result) => {
+      setActionError(null);
+      openPdf(result.pdfUrl);
+    },''',
+        '''      const result =
+        kind === 'GENERAL'
+          ? await generateGeneralDebtPdf()
+          : kind === 'ASSIGNMENTS'
+            ? await generateAssignmentsPdf()
+            : userId
+              ? await generateUserAssignmentsPdf(userId)
+              : (() => {
+                  throw new Error('No se encontró el usuario del reporte.');
+                })();
+
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        kind === 'GENERAL'
+          ? 'reporte-general-deudas.pdf'
+          : kind === 'ASSIGNMENTS'
+            ? 'reporte-asignaciones.pdf'
+            : `reporte-cobrador-${userId}.pdf`,
+      );
+    },
+    onSuccess: () => {
+      setActionError(null);
+    },''',
+    )
+
 
 if __name__ == '__main__':
     main()
