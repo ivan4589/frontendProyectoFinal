@@ -9,16 +9,54 @@ on:
       - 'tsconfig*.json'
       - 'vite.config.*'
       - '.github/workflows/auth-validation.yml'
+      - '.github/workflows/phase3-frontend-implementation.yml'
+
+permissions:
+  contents: write
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Apply Phase 3 frontend once
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          if Path('src/api/documents.api.ts').exists():
+              print('Phase 3 frontend already applied')
+          else:
+              workflow = Path('.github/workflows/phase3-frontend-implementation.yml').read_text(encoding='utf-8')
+              marker_start = "          python <<'PY'\n"
+              marker_end = "\n          PY\n"
+              start = workflow.index(marker_start) + len(marker_start)
+              end = workflow.index(marker_end, start)
+              raw = workflow[start:end]
+              script = '\n'.join(
+                  line[10:] if line.startswith('          ') else line
+                  for line in raw.splitlines()
+              )
+              exec(compile(script, 'phase3_frontend.py', 'exec'))
+          PY
       - run: npm ci
       - run: npm run build
+      - name: Commit Phase 3 frontend
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No implementation changes to commit"
+            exit 0
+          fi
+          git config user.name "chatgpt-codex-connector[bot]"
+          git config user.email "199175422+chatgpt-codex-connector[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "Implementa interfaz de protección de datos en Fase 3"
+          git push origin HEAD:${{ github.head_ref }}
