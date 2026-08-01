@@ -7,10 +7,7 @@ export interface Category {
   updatedAt?: string;
   products?: unknown[];
   subCategories?: SubCategory[];
-  _count?: {
-    products?: number;
-    subCategories?: number;
-  };
+  _count?: { products?: number; subCategories?: number };
 }
 
 export interface SubCategory {
@@ -21,9 +18,7 @@ export interface SubCategory {
   createdAt?: string;
   updatedAt?: string;
   products?: unknown[];
-  _count?: {
-    products?: number;
-  };
+  _count?: { products?: number };
 }
 
 export interface Product {
@@ -53,6 +48,8 @@ export interface Product {
   reserveQuantity?: number | null;
   additionalInfo?: string | null;
   imageUrl?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -79,22 +76,11 @@ export interface CreateProductRequest {
   imageUrl?: string;
 }
 
-export type UpdateProductRequest = Partial<CreateProductRequest>;
-
-export interface CreateCategoryRequest {
-  name: string;
+export interface UpdateProductRequest extends Partial<CreateProductRequest> {
+  changeReason?: string;
 }
 
-export interface UpdateCategoryRequest {
-  name?: string;
-}
-
-export interface CreateSubCategoryRequest {
-  name: string;
-  categoryId: string;
-}
-
-export interface UpdateSubCategoryRequest {
-  name?: string;
-  categoryId?: string;
-}
+export interface CreateCategoryRequest { name: string }
+export interface UpdateCategoryRequest { name?: string }
+export interface CreateSubCategoryRequest { name: string; categoryId: string }
+export interface UpdateSubCategoryRequest { name?: string; categoryId?: string }

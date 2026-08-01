@@ -48,6 +48,7 @@ import {
 } from '@tanstack/react-query';
 
 import { getClients } from '../../api/clients.api';
+import { downloadProtectedDocument } from '../../api/documents.api';
 import { getProducts } from '../../api/products.api';
 import { getCategories } from '../../api/categories.api';
 import { getSubCategories } from '../../api/subCategories.api';
@@ -228,27 +229,6 @@ function getPaymentStatusStyle(
   };
 
   return styles[status];
-}
-
-function getDocumentUrl(
-  value?: string | null,
-) {
-  if (!value) {
-    return '';
-  }
-
-  if (
-    value.startsWith('http://') ||
-    value.startsWith('https://')
-  ) {
-    return value;
-  }
-
-  const apiUrl =
-    import.meta.env.VITE_API_URL ||
-    'http://localhost:3000';
-
-  return `${apiUrl}${value}`;
 }
 
 function isInsideDateRange(
@@ -625,6 +605,12 @@ export function SalesPage() {
       setReturnError(
         getErrorMessage(mutationError),
       ),
+  });
+
+  const documentMutation = useMutation({
+    mutationFn: ({ url, filename }: { url: string; filename: string }) =>
+      downloadProtectedDocument(url, filename),
+    onError: (mutationError) => setActionError(getErrorMessage(mutationError)),
   });
 
   const whatsAppMutation = useMutation({
@@ -1472,18 +1458,18 @@ export function SalesPage() {
 
                         <TableCell align="right">
                           {documentUrl && (
-                            <Tooltip title="Abrir recibo">
-                              <IconButton
-                                size="small"
-                                component="a"
-                                href={getDocumentUrl(
-                                  documentUrl,
-                                )}
-                                target="_blank"
-                              >
-                                <FileDownloadIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            <Tooltip title="Descargar recibo protegido">
+                    <IconButton
+                      size="small"
+                      disabled={documentMutation.isPending}
+                      onClick={() => documentMutation.mutate({
+                        url: documentUrl,
+                        filename: `nota-venta-${sale.saleNumber}.pdf`,
+                      })}
+                    >
+                      <FileDownloadIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                           )}
 
                           {canManageOwnSale(sale) &&

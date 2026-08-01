@@ -22,6 +22,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import BusinessIcon from '@mui/icons-material/Business';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RestoreIcon from '@mui/icons-material/Restore';
 import EditIcon from '@mui/icons-material/Edit';
 import EmailIcon from '@mui/icons-material/Email';
 import LocalPhoneIcon from '@mui/icons-material/LocalPhone';
@@ -32,8 +33,9 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createProvider,
-  deleteProvider,
+  deactivateProvider,
   getProviders,
+  reactivateProvider,
   updateProvider,
 } from '../../api/providers.api';
 import { Loading } from '../../components/common/Loading';
@@ -45,6 +47,7 @@ import type {
 } from '../../types/provider.types';
 import { ProviderFormDialog } from './ProviderFormDialog';
 import { formatDate } from '../../utils/formatDate';
+import { requestEconomicReason } from '../../utils/economicOperation';
 
 function getErrorMessage(error: unknown) {
   const anyError = error as any;
@@ -124,8 +127,8 @@ export function ProvidersPage() {
     isError,
     error,
   } = useQuery({
-    queryKey: ['providers'],
-    queryFn: getProviders,
+    queryKey: ['providers', { includeInactive: isAdmin }],
+    queryFn: () => getProviders({ includeInactive: isAdmin }),
   });
 
   const filteredProviders = useMemo(() => {
@@ -197,14 +200,14 @@ export function ProvidersPage() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteProvider,
+  const statusMutation = useMutation({
+    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>
+      active ? reactivateProvider(id, reason) : deactivateProvider(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['providers'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
-    onError: (mutationError) => {
-      alert(getErrorMessage(mutationError));
-    },
+    onError: (mutationError) => alert(getErrorMessage(mutationError)),
   });
 
   const handleCreate = () => {
@@ -219,16 +222,12 @@ export function ProvidersPage() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (provider: Provider) => {
-    const confirmed = window.confirm(
-      `¿Seguro que deseas eliminar el proveedor "${provider.companyName}"?`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(provider.id);
+  const handleToggle = (provider: Provider) => {
+    const active = provider.isActive === false;
+    const action = active ? 'reactivar' : 'desactivar';
+    const reason = requestEconomicReason(`${action} al proveedor ${provider.companyName}`);
+    if (!reason) return;
+    statusMutation.mutate({ id: provider.id, active, reason });
   };
 
   const handleSubmit = (data: CreateProviderRequest) => {
@@ -459,9 +458,8 @@ export function ProvidersPage() {
                   key={provider.id}
                   hover
                   sx={{
-                    '& td': {
-                      borderColor: '#edf0f2',
-                    },
+                    opacity: provider.isActive === false ? 0.6 : 1,
+                    '& td': { borderColor: '#edf0f2' },
                   }}
                 >
                   <TableCell>
@@ -481,9 +479,10 @@ export function ProvidersPage() {
                       </Avatar>
 
                       <Box>
-                        <Typography fontWeight={800}>
-                          {provider.companyName}
-                        </Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography fontWeight={800}>{provider.companyName}</Typography>
+                          <Chip size="small" label={provider.isActive === false ? 'Inactivo' : 'Activo'} color={provider.isActive === false ? 'default' : 'success'} variant="outlined" />
+                        </Stack>
 
                         <Typography variant="caption" color="text.secondary">
                           ID: {provider.id.slice(0, 8)}
@@ -551,7 +550,7 @@ export function ProvidersPage() {
                       <span>
                         <IconButton
                           size="small"
-                          disabled={!isAdmin}
+                          disabled={!isAdmin || provider.isActive === false}
                           onClick={() => handleEdit(provider)}
                         >
                           <EditIcon fontSize="small" />
@@ -559,15 +558,15 @@ export function ProvidersPage() {
                       </span>
                     </Tooltip>
 
-                    <Tooltip title={isAdmin ? 'Eliminar' : 'Solo administrador'}>
+                    <Tooltip title={isAdmin ? (provider.isActive === false ? 'Reactivar' : 'Desactivar') : 'Solo administrador'}>
                       <span>
                         <IconButton
                           size="small"
-                          color="error"
-                          disabled={!isAdmin || deleteMutation.isPending}
-                          onClick={() => handleDelete(provider)}
+                          color={provider.isActive === false ? 'success' : 'error'}
+                          disabled={!isAdmin || statusMutation.isPending}
+                          onClick={() => handleToggle(provider)}
                         >
-                          <DeleteIcon fontSize="small" />
+                          {provider.isActive === false ? <RestoreIcon fontSize="small" /> : <DeleteIcon fontSize="small" />}
                         </IconButton>
                       </span>
                     </Tooltip>
