@@ -8,6 +8,7 @@ on:
       - 'package-lock.json'
       - 'tsconfig*.json'
       - 'vite.config.*'
+      - '.github/scripts/run_phase3_frontend.py'
       - '.github/workflows/auth-validation.yml'
       - '.github/workflows/phase3-frontend-implementation.yml'
 
@@ -28,55 +29,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Apply Phase 3 frontend once
-        run: |
-          python <<'PY'
-          from pathlib import Path
-
-          if Path('src/api/documents.api.ts').exists():
-              print('Phase 3 frontend already applied')
-          else:
-              workflow = Path('.github/workflows/phase3-frontend-implementation.yml').read_text(encoding='utf-8')
-              marker_start = "          python <<'PY'\n"
-              marker_end = "\n          PY\n"
-              start = workflow.index(marker_start) + len(marker_start)
-              end = workflow.index(marker_end, start)
-              raw = workflow[start:end]
-              script = '\n'.join(
-                  line[10:] if line.startswith('          ') else line
-                  for line in raw.splitlines()
-              )
-              script = script.replace(
-                  '"      id: string; data: CreateProductRequest }) =>\\n      updateProduct(id, data),"',
-                  '"mutationFn: ({ id, data }: { id: string; data: CreateProductRequest }) =>\\n      updateProduct(id, data),"',
-              )
-              script = script.replace(
-                  '"      id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
-                  '"mutationFn: ({ id, data }: { id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
-              )
-              script = script.replace(
-                  """if old_button not in sales_page:
-    raise SystemExit('No se encontró botón PDF de ventas')
-sales_page = sales_page.replace(old_button, new_button, 1)""",
-                  """if old_button in sales_page:
-    sales_page = sales_page.replace(old_button, new_button, 1)
-else:
-    button_start = sales_page.index('                            <Tooltip title=\"Abrir recibo\">')
-    button_end = sales_page.index('                            </Tooltip>', button_start) + len('                            </Tooltip>')
-    sales_page = sales_page[:button_start] + new_button + sales_page[button_end:]""",
-              )
-              script = script.replace(
-                  """if old_button not in purchases_page:
-    raise SystemExit('No se encontró botón PDF de compras')
-purchases_page = purchases_page.replace(old_button, new_button, 1)""",
-                  """if old_button in purchases_page:
-    purchases_page = purchases_page.replace(old_button, new_button, 1)
-else:
-    button_start = purchases_page.index('                          <Tooltip title=\"Abrir comprobante PDF\">')
-    button_end = purchases_page.index('                          </Tooltip>', button_start) + len('                          </Tooltip>')
-    purchases_page = purchases_page[:button_start] + new_button + purchases_page[button_end:]""",
-              )
-              exec(compile(script, 'phase3_frontend.py', 'exec'))
-          PY
+        run: python .github/scripts/run_phase3_frontend.py
       - run: npm ci
       - run: npm run build
       - name: Commit Phase 3 frontend
