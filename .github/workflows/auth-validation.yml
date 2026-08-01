@@ -53,6 +53,28 @@ jobs:
                   '"      id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
                   '"mutationFn: ({ id, data }: { id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
               )
+              script = script.replace(
+                  """if old_button not in sales_page:
+    raise SystemExit('No se encontró botón PDF de ventas')
+sales_page = sales_page.replace(old_button, new_button, 1)""",
+                  """if old_button in sales_page:
+    sales_page = sales_page.replace(old_button, new_button, 1)
+else:
+    button_start = sales_page.index('                            <Tooltip title=\"Abrir recibo\">')
+    button_end = sales_page.index('                            </Tooltip>', button_start) + len('                            </Tooltip>')
+    sales_page = sales_page[:button_start] + new_button + sales_page[button_end:]""",
+              )
+              script = script.replace(
+                  """if old_button not in purchases_page:
+    raise SystemExit('No se encontró botón PDF de compras')
+purchases_page = purchases_page.replace(old_button, new_button, 1)""",
+                  """if old_button in purchases_page:
+    purchases_page = purchases_page.replace(old_button, new_button, 1)
+else:
+    button_start = purchases_page.index('                          <Tooltip title=\"Abrir comprobante PDF\">')
+    button_end = purchases_page.index('                          </Tooltip>', button_start) + len('                          </Tooltip>')
+    purchases_page = purchases_page[:button_start] + new_button + purchases_page[button_end:]""",
+              )
               exec(compile(script, 'phase3_frontend.py', 'exec'))
           PY
       - run: npm ci
