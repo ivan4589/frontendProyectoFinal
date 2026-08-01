@@ -11,9 +11,7 @@ import type {
 } from '../types/sale.types';
 
 function normalizeSalesResponse(data: unknown): Sale[] {
-  if (Array.isArray(data)) {
-    return data;
-  }
+  if (Array.isArray(data)) return data;
 
   if (
     data &&
@@ -45,21 +43,10 @@ export async function getSales(params?: {
 }): Promise<Sale[]> {
   const response = await api.get<unknown>('/sales', {
     params: {
-      status:
-        params?.status === 'ALL'
-          ? undefined
-          : params?.status,
-
+      status: params?.status === 'ALL' ? undefined : params?.status,
       paymentStatus:
-        params?.paymentStatus === 'ALL'
-          ? undefined
-          : params?.paymentStatus,
-
-      clientId:
-        params?.clientId === 'ALL'
-          ? undefined
-          : params?.clientId,
-
+        params?.paymentStatus === 'ALL' ? undefined : params?.paymentStatus,
+      clientId: params?.clientId === 'ALL' ? undefined : params?.clientId,
       dateFrom: params?.dateFrom || undefined,
       dateTo: params?.dateTo || undefined,
     },
@@ -68,24 +55,13 @@ export async function getSales(params?: {
   return normalizeSalesResponse(response.data);
 }
 
-export async function getSaleById(
-  id: string,
-): Promise<Sale> {
-  const response = await api.get<Sale>(
-    `/sales/${id}`,
-  );
-
+export async function getSaleById(id: string): Promise<Sale> {
+  const response = await api.get<Sale>(`/sales/${id}`);
   return response.data;
 }
 
-export async function createSale(
-  data: CreateSaleRequest,
-): Promise<Sale> {
-  const response = await api.post<Sale>(
-    '/sales',
-    data,
-  );
-
+export async function createSale(data: CreateSaleRequest): Promise<Sale> {
+  const response = await api.post<Sale>('/sales', data);
   return response.data;
 }
 
@@ -93,31 +69,17 @@ export async function updateSale(
   id: string,
   data: UpdateSaleRequest,
 ): Promise<Sale> {
-  const response = await api.patch<Sale>(
-    `/sales/${id}`,
-    data,
-  );
-
+  const response = await api.patch<Sale>(`/sales/${id}`, data);
   return response.data;
 }
 
-export async function confirmSale(
-  id: string,
-): Promise<Sale> {
-  const response = await api.patch<Sale>(
-    `/sales/${id}/confirm`,
-  );
-
+export async function confirmSale(id: string): Promise<Sale> {
+  const response = await api.patch<Sale>(`/sales/${id}/confirm`, {});
   return response.data;
 }
 
-export async function cancelSale(
-  id: string,
-): Promise<Sale> {
-  const response = await api.delete<Sale>(
-    `/sales/${id}`,
-  );
-
+export async function cancelSale(id: string, reason: string): Promise<Sale> {
+  const response = await api.patch<Sale>(`/sales/${id}/cancel`, { reason });
   return response.data;
 }
 
@@ -125,12 +87,10 @@ export async function createSaleReturn(
   saleId: string,
   data: CreateSaleReturnRequest,
 ): Promise<SaleReturnResponse> {
-  const response =
-    await api.post<SaleReturnResponse>(
-      `/sales/${saleId}/returns`,
-      data,
-    );
-
+  const response = await api.post<SaleReturnResponse>(
+    `/sales/${saleId}/returns`,
+    data,
+  );
   return response.data;
 }
 
@@ -138,13 +98,9 @@ export async function sendSaleWhatsApp(
   saleId: string,
   resend = false,
 ): Promise<SendSaleWhatsAppResponse> {
-  const response =
-    await api.post<SendSaleWhatsAppResponse>(
-      `/sales/${saleId}/whatsapp`,
-      {
-        resend,
-      },
-    );
-
+  const response = await api.post<SendSaleWhatsAppResponse>(
+    `/sales/${saleId}/whatsapp`,
+    { resend },
+  );
   return response.data;
 }

@@ -47,3 +47,22 @@ export interface InventoryPdfResponse {
   historyId: string;
   message: string;
 }
+
+export interface AdjustInventoryRequest {
+  warehouseId: string;
+  productId: string;
+  quantityChange: number;
+  reason: string;
+}
+
+export interface AdjustInventoryResponse {
+  movementId: string;
+  warehouseId: string;
+  warehouseName: string;
+  productId: string;
+  productName: string;
+  previousStock: number;
+  quantityChange: number;
+  newStock: number;
+  reservedStock: number;
+}

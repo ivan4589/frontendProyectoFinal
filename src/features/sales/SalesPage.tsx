@@ -75,6 +75,7 @@ import {
 } from '../../utils/formatDate';
 
 import { getImageUrl } from '../../utils/getImageUrl';
+import { requestEconomicReason } from '../../utils/economicOperation';
 
 import type {
   CreateSaleRequest,
@@ -585,7 +586,8 @@ export function SalesPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: cancelSale,
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      cancelSale(id, reason),
 
     onSuccess: async () => {
       await refreshSales();
@@ -709,21 +711,13 @@ export function SalesPage() {
     );
   };
 
-  const handleCancelSale = (
-    sale: Sale,
-  ) => {
-    const confirmed =
-      window.confirm(
-        `¿Anular la venta ${sale.saleNumber}? La venta continuará en el historial.`,
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    cancelMutation.mutate(
-      sale.id,
+  const handleCancelSale = (sale: Sale) => {
+    const reason = requestEconomicReason(
+      `anular la venta ${sale.saleNumber}`,
     );
+    if (!reason) return;
+
+    cancelMutation.mutate({ id: sale.id, reason });
   };
 
   const handleReturn = (

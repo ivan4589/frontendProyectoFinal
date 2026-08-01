@@ -140,11 +140,15 @@ export function SaleReturnDialog({
       return;
     }
 
+    const reason = observations.trim();
+    if (reason.length < 10) {
+      setLocalError('El motivo de la devolución debe tener al menos 10 caracteres');
+      return;
+    }
+
     onSubmit({
       details,
-      observations:
-        observations.trim() ||
-        undefined,
+      observations: reason,
     });
   };
 
@@ -294,8 +298,11 @@ export function SaleReturnDialog({
           fullWidth
           multiline
           minRows={3}
-          label="Motivo u observaciones"
+          label="Motivo de la devolución"
           value={observations}
+          required
+          helperText="Obligatorio, entre 10 y 500 caracteres."
+          slotProps={{ htmlInput: { maxLength: 500 } }}
           onChange={(event) =>
             setObservations(
               event.target.value,

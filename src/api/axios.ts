@@ -32,6 +32,34 @@ function responseToken(response: LoginResponse) {
   return response.access_token || response.accessToken || response.token;
 }
 
+function createOperationKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+}
+
+function requiresIdempotency(config: InternalAxiosRequestConfig) {
+  const method = (config.method || 'get').toLowerCase();
+  const path = (config.url || '').split('?')[0];
+
+  if (!['post', 'patch', 'delete'].includes(method)) {
+    return false;
+  }
+
+  return [
+    '/sales',
+    '/payments',
+    '/purchases',
+    '/warehouse-transfers',
+    '/collections/sales',
+    '/inventory/adjustments',
+  ].some((prefix) => path.startsWith(prefix));
+}
+
 async function refreshAccessToken() {
   if (!refreshPromise) {
     refreshPromise = refreshClient
@@ -70,6 +98,11 @@ function mustNotRefresh(url?: string) {
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  if (requiresIdempotency(config) && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = createOperationKey();
+  }
+
   return config;
 });
 

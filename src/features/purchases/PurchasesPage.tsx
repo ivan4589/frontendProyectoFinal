@@ -70,6 +70,7 @@ import { useAuth } from '../auth/AuthContext';
 
 import { formatCurrency } from '../../utils/formatCurrency';
 import { formatDate } from '../../utils/formatDate';
+import { requestEconomicReason } from '../../utils/economicOperation';
 
 import type {
   CreatePurchaseRequest,
@@ -656,11 +657,13 @@ export function PurchasesPage() {
     mutationFn: ({
       purchaseId,
       providerGroupId,
+      reason,
     }: {
       purchaseId: string;
       providerGroupId: string;
+      reason: string;
     }) =>
-      cancelPurchaseProvider(purchaseId, providerGroupId),
+      cancelPurchaseProvider(purchaseId, providerGroupId, reason),
 
     onSuccess: async () => {
       await refreshPurchasesAndProducts();
@@ -676,7 +679,8 @@ export function PurchasesPage() {
   });
 
   const cancelPurchaseMutation = useMutation({
-    mutationFn: cancelPurchase,
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      cancelPurchase(id, reason),
 
     onSuccess: async () => {
       await refreshPurchasesAndProducts();
@@ -763,17 +767,26 @@ export function PurchasesPage() {
     }
 
     if (confirmAction.kind === 'CANCEL_PROVIDER') {
+      const reason = requestEconomicReason(
+        `anular al proveedor ${confirmAction.providerGroup.providerName}`,
+      );
+      if (!reason) return;
       cancelProviderMutation.mutate({
         purchaseId: confirmAction.purchase.id,
         providerGroupId: confirmAction.providerGroup.id,
+        reason,
       });
-
       return;
     }
 
-    cancelPurchaseMutation.mutate(
-      confirmAction.purchase.id,
+    const reason = requestEconomicReason(
+      `anular la compra #${confirmAction.purchase.id.slice(0, 8)}`,
     );
+    if (!reason) return;
+    cancelPurchaseMutation.mutate({
+      id: confirmAction.purchase.id,
+      reason,
+    });
   };
 
   const clearFilters = () => {
