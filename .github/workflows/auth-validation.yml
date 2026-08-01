@@ -9,6 +9,7 @@ on:
       - 'tsconfig*.json'
       - 'vite.config.*'
       - '.github/scripts/run_phase3_frontend.py'
+      - '.github/scripts/finalize_phase3_frontend.py'
       - '.github/workflows/auth-validation.yml'
       - '.github/workflows/phase3-frontend-implementation.yml'
 
@@ -30,8 +31,16 @@ jobs:
           cache: npm
       - name: Apply Phase 3 frontend once
         run: python .github/scripts/run_phase3_frontend.py
+      - name: Finalize Phase 3 frontend
+        run: python .github/scripts/finalize_phase3_frontend.py
       - run: npm ci
       - run: npm run build
+      - name: Reject public sensitive document links
+        run: |
+          if grep -R -nE "window\.open\(|/uploads/(reports|sales|purchases)" src; then
+            echo "Sensitive document links must use authenticated Blob downloads."
+            exit 1
+          fi
       - name: Commit Phase 3 frontend
         run: |
           if git diff --quiet && git diff --cached --quiet; then
@@ -41,5 +50,5 @@ jobs:
           git config user.name "chatgpt-codex-connector[bot]"
           git config user.email "199175422+chatgpt-codex-connector[bot]@users.noreply.github.com"
           git add src
-          git commit -m "Implementa interfaz de protección de datos en Fase 3"
+          git commit -m "Finaliza interfaz segura de datos y documentos en Fase 3"
           git push origin HEAD:${{ github.head_ref }}
