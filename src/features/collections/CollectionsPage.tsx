@@ -51,6 +51,7 @@ import {
   unassignCollection,
 } from '../../api/collections.api';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
+import { downloadProtectedDocument } from '../../api/documents.api';
 import { Loading } from '../../components/common/Loading';
 import type {
   CollectionDebtClient,
@@ -112,19 +113,6 @@ function getErrorMessage(error: unknown): string {
     requestError.message ||
     'No se pudo completar la operación.'
   );
-}
-
-function openPdf(pdfUrl: string) {
-  const absoluteUrl =
-    pdfUrl.startsWith('http://') ||
-    pdfUrl.startsWith('https://')
-      ? pdfUrl
-      : `${
-          import.meta.env.VITE_API_URL ||
-          'http://localhost:3000'
-        }${pdfUrl}`;
-
-  window.open(absoluteUrl, '_blank', 'noopener,noreferrer');
 }
 
 export function CollectionsPage() {
@@ -226,25 +214,28 @@ export function CollectionsPage() {
       kind: 'GENERAL' | 'ASSIGNMENTS' | 'USER';
       userId?: number;
     }) => {
-      if (kind === 'GENERAL') {
-        return generateGeneralDebtPdf();
-      }
+      const result =
+        kind === 'GENERAL'
+          ? await generateGeneralDebtPdf()
+          : kind === 'ASSIGNMENTS'
+            ? await generateAssignmentsPdf()
+            : userId
+              ? await generateUserAssignmentsPdf(userId)
+              : (() => {
+                  throw new Error('No se encontró el usuario del reporte.');
+                })();
 
-      if (kind === 'ASSIGNMENTS') {
-        return generateAssignmentsPdf();
-      }
-
-      if (!userId) {
-        throw new Error(
-          'No se encontró el usuario del reporte.',
-        );
-      }
-
-      return generateUserAssignmentsPdf(userId);
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        kind === 'GENERAL'
+          ? 'reporte-general-deudas.pdf'
+          : kind === 'ASSIGNMENTS'
+            ? 'reporte-asignaciones.pdf'
+            : `reporte-cobrador-${userId}.pdf`,
+      );
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       setActionError(null);
-      openPdf(result.pdfUrl);
     },
     onError: (error) => {
       setActionError(getErrorMessage(error));

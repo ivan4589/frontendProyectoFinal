@@ -198,16 +198,22 @@ export function ReportsPage() {
   });
 
   const pdfMutation = useMutation({
-    mutationFn: () => generateAnalyticsReportPdf(activeKey!, requestFilters),
-    onSuccess: (result) => {
-      void downloadProtectedDocument(result.pdfUrl, `${activeKey || "reporte"}.pdf`);
+    mutationFn: async () => {
+      const result = await generateAnalyticsReportPdf(activeKey!, requestFilters);
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        `${activeKey || "reporte"}.pdf`,
+      );
     },
   });
 
   const matrixPdfMutation = useMutation({
-    mutationFn: () => generateSalesMatrixPdf(requestFilters),
-    onSuccess: (result) => {
-      void downloadProtectedDocument(result.pdfUrl, `${activeKey || "reporte"}.pdf`);
+    mutationFn: async () => {
+      const result = await generateSalesMatrixPdf(requestFilters);
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        "reporte-matriz-ventas.pdf",
+      );
     },
   });
 

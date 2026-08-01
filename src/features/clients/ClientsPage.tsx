@@ -194,11 +194,13 @@ export function ClientsPage() {
   }, [clients, locations, search, typeFilter, locationFilter]);
 
   const summary = useMemo(() => {
+    const activeClients = clients.filter((client) => client.isActive !== false);
+
     return {
-      total: clients.length,
-      normal: clients.filter((client) => client.type === 'NORMAL').length,
-      especial: clients.filter((client) => client.type === 'ESPECIAL').length,
-      camino: clients.filter((client) => client.type === 'CAMINO').length,
+      total: activeClients.length,
+      normal: activeClients.filter((client) => client.type === 'NORMAL').length,
+      especial: activeClients.filter((client) => client.type === 'ESPECIAL').length,
+      camino: activeClients.filter((client) => client.type === 'CAMINO').length,
       locations: locations.length,
     };
   }, [clients, locations]);

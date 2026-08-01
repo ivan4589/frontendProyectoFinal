@@ -867,7 +867,9 @@ export function ProductsPage() {
                       <Stack direction="row" spacing={0.75} alignItems="center">
                         <StorefrontIcon fontSize="small" color="action" />
                         <Typography variant="body2">
-                          {getProviderName(product, providers)}
+                          {isAdmin
+                            ? getProviderName(product, providers)
+                            : 'Información restringida'}
                         </Typography>
                       </Stack>
                     </TableCell>
