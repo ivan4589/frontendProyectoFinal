@@ -1,0 +1,666 @@
+name: Phase 3 frontend implementation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/phase3-frontend-implementation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply frontend Phase 3
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def write(path: str, content: str):
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding='utf-8')
+
+          def replace_once(path: str, old: str, new: str):
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'No se encontró el bloque esperado en {path}: {old[:100]!r}')
+              target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          write('src/api/documents.api.ts', '''import { api } from './axios';
+
+function normalizeProtectedPath(value: string): string {
+  const raw = value.startsWith('http://') || value.startsWith('https://')
+    ? `${new URL(value).pathname}${new URL(value).search}`
+    : value;
+
+  if (raw.startsWith('/api/')) return raw.slice(4);
+  if (raw === '/api') return '/';
+  return raw.startsWith('/') ? raw : `/${raw}`;
+}
+
+function filenameFromDisposition(
+  disposition: string | undefined,
+  fallback: string,
+): string {
+  if (!disposition) return fallback;
+
+  const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (utf8) return decodeURIComponent(utf8.replace(/["']/g, ''));
+
+  const regular = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  return regular?.trim() || fallback;
+}
+
+export async function downloadProtectedDocument(
+  documentUrl: string,
+  fallbackFilename: string,
+): Promise<void> {
+  const response = await api.get<Blob>(normalizeProtectedPath(documentUrl), {
+    responseType: 'blob',
+    headers: { Accept: 'application/pdf,application/octet-stream' },
+  });
+
+  const blobUrl = URL.createObjectURL(response.data);
+  const anchor = document.createElement('a');
+  anchor.href = blobUrl;
+  anchor.download = filenameFromDisposition(
+    response.headers['content-disposition'],
+    fallbackFilename,
+  );
+  anchor.rel = 'noopener';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1_000);
+}
+''')
+
+          write('src/types/client.types.ts', '''export type ClientType = 'NORMAL' | 'ESPECIAL' | 'CAMINO';
+
+export interface Location {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  clients?: unknown[];
+  _count?: { clients?: number };
+}
+
+export interface Client {
+  id: string;
+  fullName: string;
+  alias?: string | null;
+  type: ClientType;
+  locationId: string;
+  locationName?: string;
+  location?: Location;
+  phone?: string | null;
+  whatsappConsent: boolean;
+  additionalInfo?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  sales?: unknown[];
+  payments?: unknown[];
+  _count?: { sales?: number; payments?: number };
+}
+
+export interface CreateClientRequest {
+  fullName: string;
+  alias?: string;
+  type: ClientType;
+  locationId: string;
+  phone?: string;
+  whatsappConsent?: boolean;
+  additionalInfo?: string;
+}
+
+export interface UpdateClientRequest extends Partial<CreateClientRequest> {}
+
+export interface CreateLocationRequest { name: string }
+export interface UpdateLocationRequest { name?: string }
+''')
+
+          write('src/api/clients.api.ts', '''import { api } from './axios';
+import type {
+  Client,
+  CreateClientRequest,
+  UpdateClientRequest,
+} from '../types/client.types';
+
+function normalizeClientsResponse(data: unknown): Client[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && 'clients' in data && Array.isArray((data as { clients: unknown }).clients)) {
+    return (data as { clients: Client[] }).clients;
+  }
+  if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as { data: unknown }).data)) {
+    return (data as { data: Client[] }).data;
+  }
+  return [];
+}
+
+export async function getClients(params?: {
+  locationId?: string;
+  type?: string;
+  includeInactive?: boolean;
+}): Promise<Client[]> {
+  const response = await api.get<unknown>('/clients', { params });
+  return normalizeClientsResponse(response.data);
+}
+
+export async function getClientById(id: string): Promise<Client> {
+  const response = await api.get<Client>(`/clients/${id}`);
+  return response.data;
+}
+
+export async function createClient(data: CreateClientRequest): Promise<Client> {
+  const response = await api.post<Client>('/clients', data);
+  return response.data;
+}
+
+export async function updateClient(id: string, data: UpdateClientRequest): Promise<Client> {
+  const response = await api.patch<Client>(`/clients/${id}`, data);
+  return response.data;
+}
+
+export async function deactivateClient(id: string, reason: string): Promise<Client> {
+  const response = await api.patch<Client>(`/clients/${id}/deactivate`, { reason });
+  return response.data;
+}
+
+export async function reactivateClient(id: string, reason: string): Promise<Client> {
+  const response = await api.patch<Client>(`/clients/${id}/reactivate`, { reason });
+  return response.data;
+}
+''')
+
+          write('src/types/provider.types.ts', '''export interface Provider {
+  id: string;
+  companyName: string;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  products?: unknown[];
+  purchases?: unknown[];
+  _count?: { products?: number; purchases?: number };
+}
+
+export interface CreateProviderRequest {
+  companyName: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface UpdateProviderRequest extends Partial<CreateProviderRequest> {}
+''')
+
+          write('src/api/providers.api.ts', '''import { api } from './axios';
+import type {
+  CreateProviderRequest,
+  Provider,
+  UpdateProviderRequest,
+} from '../types/provider.types';
+
+function normalizeProvidersResponse(data: unknown): Provider[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && 'providers' in data && Array.isArray((data as { providers: unknown }).providers)) {
+    return (data as { providers: Provider[] }).providers;
+  }
+  if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as { data: unknown }).data)) {
+    return (data as { data: Provider[] }).data;
+  }
+  return [];
+}
+
+export async function getProviders(params?: { includeInactive?: boolean }): Promise<Provider[]> {
+  const response = await api.get<unknown>('/providers', { params });
+  return normalizeProvidersResponse(response.data);
+}
+
+export async function getProviderById(id: string): Promise<Provider> {
+  const response = await api.get<Provider>(`/providers/${id}`);
+  return response.data;
+}
+
+export async function createProvider(data: CreateProviderRequest): Promise<Provider> {
+  const response = await api.post<Provider>('/providers', data);
+  return response.data;
+}
+
+export async function updateProvider(id: string, data: UpdateProviderRequest): Promise<Provider> {
+  const response = await api.patch<Provider>(`/providers/${id}`, data);
+  return response.data;
+}
+
+export async function deactivateProvider(id: string, reason: string): Promise<Provider> {
+  const response = await api.patch<Provider>(`/providers/${id}/deactivate`, { reason });
+  return response.data;
+}
+
+export async function reactivateProvider(id: string, reason: string): Promise<Provider> {
+  const response = await api.patch<Provider>(`/providers/${id}/reactivate`, { reason });
+  return response.data;
+}
+''')
+
+          write('src/types/product.types.ts', '''import type { Provider } from './provider.types';
+
+export interface Category {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  products?: unknown[];
+  subCategories?: SubCategory[];
+  _count?: { products?: number; subCategories?: number };
+}
+
+export interface SubCategory {
+  id: string;
+  name: string;
+  categoryId: string;
+  category?: Category;
+  createdAt?: string;
+  updatedAt?: string;
+  products?: unknown[];
+  _count?: { products?: number };
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description?: string | null;
+  providerId: string;
+  provider?: Provider;
+  categoryId: string;
+  category?: Category;
+  subCategoryId?: string | null;
+  subCategory?: SubCategory | null;
+  weight?: string | null;
+  purchasePrice?: number;
+  priceNormal: number;
+  priceCamino: number;
+  priceEspecial: number;
+  priceMayorista?: number | null;
+  minQuantityWholesale?: number | null;
+  stock: number;
+  reservedStock?: number;
+  centralStock?: number;
+  centralReservedStock?: number;
+  centralAvailableStock?: number;
+  minStock: number;
+  unit: string;
+  reserveQuantity?: number | null;
+  additionalInfo?: string | null;
+  imageUrl?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  description?: string;
+  providerId: string;
+  categoryId: string;
+  subCategoryId?: string;
+  weight?: string;
+  purchasePrice: number;
+  priceNormal: number;
+  priceCamino: number;
+  priceEspecial: number;
+  priceMayorista?: number;
+  minQuantityWholesale?: number;
+  stock?: number;
+  reservedStock?: number;
+  minStock?: number;
+  unit?: string;
+  reserveQuantity?: number;
+  additionalInfo?: string;
+  imageUrl?: string;
+}
+
+export interface UpdateProductRequest extends Partial<CreateProductRequest> {
+  changeReason?: string;
+}
+
+export interface CreateCategoryRequest { name: string }
+export interface UpdateCategoryRequest { name?: string }
+export interface CreateSubCategoryRequest { name: string; categoryId: string }
+export interface UpdateSubCategoryRequest { name?: string; categoryId?: string }
+''')
+
+          write('src/api/products.api.ts', '''import { api } from './axios';
+import type {
+  CreateProductRequest,
+  Product,
+  UpdateProductRequest,
+} from '../types/product.types';
+
+function normalizeProductsResponse(data: unknown): Product[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && 'products' in data && Array.isArray((data as { products: unknown }).products)) {
+    return (data as { products: Product[] }).products;
+  }
+  if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as { data: unknown }).data)) {
+    return (data as { data: Product[] }).data;
+  }
+  return [];
+}
+
+export async function getProducts(params?: {
+  search?: string;
+  categoryId?: string;
+  providerId?: string;
+  includeInactive?: boolean;
+}): Promise<Product[]> {
+  const response = await api.get<unknown>('/products', { params });
+  return normalizeProductsResponse(response.data);
+}
+
+export async function getProductById(id: string): Promise<Product> {
+  const response = await api.get<Product>(`/products/${id}`);
+  return response.data;
+}
+
+export async function createProduct(data: CreateProductRequest): Promise<Product> {
+  const response = await api.post<Product>('/products', data);
+  return response.data;
+}
+
+export async function updateProduct(id: string, data: UpdateProductRequest): Promise<Product> {
+  const response = await api.patch<Product>(`/products/${id}`, data);
+  return response.data;
+}
+
+export async function deactivateProduct(id: string, reason: string): Promise<Product> {
+  const response = await api.patch<Product>(`/products/${id}/deactivate`, { reason });
+  return response.data;
+}
+
+export async function reactivateProduct(id: string, reason: string): Promise<Product> {
+  const response = await api.patch<Product>(`/products/${id}/reactivate`, { reason });
+  return response.data;
+}
+''')
+
+          report_types = Path('src/types/report.types.ts').read_text(encoding='utf-8')
+          report_types = report_types.replace(
+              'export interface ReportPdfResponse {\n  pdfUrl: string;\n}',
+              'export interface ReportPdfResponse {\n  pdfUrl: string;\n  historyId?: string;\n}',
+          )
+          Path('src/types/report.types.ts').write_text(report_types, encoding='utf-8')
+
+          # Clients page
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "import DeleteIcon from '@mui/icons-material/Delete';",
+              "import DeleteIcon from '@mui/icons-material/Delete';\nimport RestoreIcon from '@mui/icons-material/Restore';")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "  createClient,\n  deleteClient,\n  getClients,\n  updateClient,",
+              "  createClient,\n  deactivateClient,\n  getClients,\n  reactivateClient,\n  updateClient,")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "import { formatDate } from '../../utils/formatDate';",
+              "import { formatDate } from '../../utils/formatDate';\nimport { requestEconomicReason } from '../../utils/economicOperation';")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "  const canCreateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_CREATE);",
+              "  const isAdmin = user?.role === 'ADMIN';\n  const canCreateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_CREATE);")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "    queryKey: ['clients'],\n    queryFn: () => getClients(),",
+              "    queryKey: ['clients', { includeInactive: isAdmin }],\n    queryFn: () => getClients({ includeInactive: isAdmin }),")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "  const deleteClientMutation = useMutation({\n    mutationFn: deleteClient,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['clients'] });\n    },\n    onError: (mutationError) => {\n      alert(getErrorMessage(mutationError));\n    },\n  });",
+              "  const clientStatusMutation = useMutation({\n    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>\n      active ? reactivateClient(id, reason) : deactivateClient(id, reason),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['clients'] });\n    },\n    onError: (mutationError) => {\n      alert(getErrorMessage(mutationError));\n    },\n  });")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "  const handleDeleteClient = (client: Client) => {\n    const confirmed = window.confirm(\n      `¿Seguro que deseas eliminar el cliente \"${client.fullName}\"?`,\n    );\n\n    if (!confirmed) return;\n\n    deleteClientMutation.mutate(client.id);\n  };",
+              "  const handleToggleClient = (client: Client) => {\n    const active = client.isActive === false;\n    const action = active ? 'reactivar' : 'desactivar';\n    const reason = requestEconomicReason(`${action} al cliente ${client.fullName}`);\n    if (!reason) return;\n    clientStatusMutation.mutate({ id: client.id, active, reason });\n  };")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "  if (client.location?.name) return client.location.name;",
+              "  if (client.locationName) return client.locationName;\n  if (client.location?.name) return client.location.name;")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "                    sx={{\n                      '& td': {\n                        borderColor: '#edf0f2',\n                      },\n                    }}",
+              "                    sx={{\n                      opacity: client.isActive === false ? 0.6 : 1,\n                      '& td': { borderColor: '#edf0f2' },\n                    }}")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "                          <Typography fontWeight={800}>{client.fullName}</Typography>",
+              "                          <Stack direction=\"row\" spacing={1} alignItems=\"center\">\n                            <Typography fontWeight={800}>{client.fullName}</Typography>\n                            <Chip size=\"small\" label={client.isActive === false ? 'Inactivo' : 'Activo'} color={client.isActive === false ? 'default' : 'success'} variant=\"outlined\" />\n                          </Stack>")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "                          <IconButton size=\"small\" onClick={() => handleEditClient(client)}>",
+              "                          <IconButton size=\"small\" disabled={client.isActive === false} onClick={() => handleEditClient(client)}>")
+          replace_once('src/features/clients/ClientsPage.tsx',
+              "                        <Tooltip title=\"Eliminar\">\n                          <IconButton\n                            size=\"small\"\n                            color=\"error\"\n                            disabled={deleteClientMutation.isPending}\n                            onClick={() => handleDeleteClient(client)}\n                          >\n                            <DeleteIcon fontSize=\"small\" />\n                          </IconButton>\n                        </Tooltip>",
+              "                        <Tooltip title={client.isActive === false ? 'Reactivar' : 'Desactivar'}>\n                          <IconButton\n                            size=\"small\"\n                            color={client.isActive === false ? 'success' : 'error'}\n                            disabled={clientStatusMutation.isPending}\n                            onClick={() => handleToggleClient(client)}\n                          >\n                            {client.isActive === false ? <RestoreIcon fontSize=\"small\" /> : <DeleteIcon fontSize=\"small\" />}\n                          </IconButton>\n                        </Tooltip>")
+
+          # Providers page
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "import DeleteIcon from '@mui/icons-material/Delete';",
+              "import DeleteIcon from '@mui/icons-material/Delete';\nimport RestoreIcon from '@mui/icons-material/Restore';")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "  createProvider,\n  deleteProvider,\n  getProviders,\n  updateProvider,",
+              "  createProvider,\n  deactivateProvider,\n  getProviders,\n  reactivateProvider,\n  updateProvider,")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "import { formatDate } from '../../utils/formatDate';",
+              "import { formatDate } from '../../utils/formatDate';\nimport { requestEconomicReason } from '../../utils/economicOperation';")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "    queryKey: ['providers'],\n    queryFn: getProviders,",
+              "    queryKey: ['providers', { includeInactive: isAdmin }],\n    queryFn: () => getProviders({ includeInactive: isAdmin }),")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "  const deleteMutation = useMutation({\n    mutationFn: deleteProvider,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['providers'] });\n    },\n    onError: (mutationError) => {\n      alert(getErrorMessage(mutationError));\n    },\n  });",
+              "  const statusMutation = useMutation({\n    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>\n      active ? reactivateProvider(id, reason) : deactivateProvider(id, reason),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: ['providers'] });\n      queryClient.invalidateQueries({ queryKey: ['products'] });\n    },\n    onError: (mutationError) => alert(getErrorMessage(mutationError)),\n  });")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "  const handleDelete = (provider: Provider) => {\n    const confirmed = window.confirm(\n      `¿Seguro que deseas eliminar el proveedor \"${provider.companyName}\"?`,\n    );\n\n    if (!confirmed) {\n      return;\n    }\n\n    deleteMutation.mutate(provider.id);\n  };",
+              "  const handleToggle = (provider: Provider) => {\n    const active = provider.isActive === false;\n    const action = active ? 'reactivar' : 'desactivar';\n    const reason = requestEconomicReason(`${action} al proveedor ${provider.companyName}`);\n    if (!reason) return;\n    statusMutation.mutate({ id: provider.id, active, reason });\n  };")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "                  sx={{\n                    '& td': {\n                      borderColor: '#edf0f2',\n                    },\n                  }}",
+              "                  sx={{\n                    opacity: provider.isActive === false ? 0.6 : 1,\n                    '& td': { borderColor: '#edf0f2' },\n                  }}")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "                        <Typography fontWeight={800}>\n                          {provider.companyName}\n                        </Typography>",
+              "                        <Stack direction=\"row\" spacing={1} alignItems=\"center\">\n                          <Typography fontWeight={800}>{provider.companyName}</Typography>\n                          <Chip size=\"small\" label={provider.isActive === false ? 'Inactivo' : 'Activo'} color={provider.isActive === false ? 'default' : 'success'} variant=\"outlined\" />\n                        </Stack>")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "                          disabled={!isAdmin}\n                          onClick={() => handleEdit(provider)}",
+              "                          disabled={!isAdmin || provider.isActive === false}\n                          onClick={() => handleEdit(provider)}")
+          replace_once('src/features/providers/ProvidersPage.tsx',
+              "                    <Tooltip title={isAdmin ? 'Eliminar' : 'Solo administrador'}>\n                      <span>\n                        <IconButton\n                          size=\"small\"\n                          color=\"error\"\n                          disabled={!isAdmin || deleteMutation.isPending}\n                          onClick={() => handleDelete(provider)}\n                        >\n                          <DeleteIcon fontSize=\"small\" />\n                        </IconButton>\n                      </span>\n                    </Tooltip>",
+              "                    <Tooltip title={isAdmin ? (provider.isActive === false ? 'Reactivar' : 'Desactivar') : 'Solo administrador'}>\n                      <span>\n                        <IconButton\n                          size=\"small\"\n                          color={provider.isActive === false ? 'success' : 'error'}\n                          disabled={!isAdmin || statusMutation.isPending}\n                          onClick={() => handleToggle(provider)}\n                        >\n                          {provider.isActive === false ? <RestoreIcon fontSize=\"small\" /> : <DeleteIcon fontSize=\"small\" />}\n                        </IconButton>\n                      </span>\n                    </Tooltip>")
+
+          # Products page
+          replace_once('src/features/products/ProductsPage.tsx',
+              'import DeleteIcon from "@mui/icons-material/Delete";',
+              'import DeleteIcon from "@mui/icons-material/Delete";\nimport RestoreIcon from "@mui/icons-material/Restore";')
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  createProduct,\n  deleteProduct,\n  getProducts,\n  updateProduct,",
+              "  createProduct,\n  deactivateProduct,\n  getProducts,\n  reactivateProduct,\n  updateProduct,")
+          replace_once('src/features/products/ProductsPage.tsx',
+              '  Product,\n  SubCategory,',
+              '  Product,\n  SubCategory,\n  UpdateProductRequest,')
+          replace_once('src/features/products/ProductsPage.tsx',
+              'import { getImageUrl } from "../../utils/getImageUrl";',
+              'import { getImageUrl } from "../../utils/getImageUrl";\nimport { requestEconomicReason } from "../../utils/economicOperation";')
+          replace_once('src/features/products/ProductsPage.tsx',
+              '    queryKey: ["products"],\n    queryFn: () => getProducts(),',
+              '    queryKey: ["products", { includeInactive: isAdmin }],\n    queryFn: () => getProducts({ includeInactive: isAdmin }),')
+          replace_once('src/features/products/ProductsPage.tsx',
+              '    queryKey: ["providers"],\n    queryFn: getProviders,',
+              '    queryKey: ["providers", { includeInactive: isAdmin }],\n    queryFn: () => getProviders({ includeInactive: isAdmin }),\n    enabled: isAdmin,')
+          replace_once('src/features/products/ProductsPage.tsx',
+              "    const lowStock = products.filter(\n      (product) => product.minStock > 0 && product.stock <= product.minStock,\n    ).length;",
+              "    const activeProducts = products.filter((product) => product.isActive !== false);\n    const lowStock = activeProducts.filter(\n      (product) => product.minStock > 0 && product.stock <= product.minStock,\n    ).length;")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "    const totalStock = products.reduce(\n      (sum, product) => sum + product.stock,\n      0,\n    );\n\n    const inventoryValue = products.reduce(\n      (sum, product) => sum + product.stock * product.purchasePrice,\n      0,\n    );",
+              "    const totalStock = activeProducts.reduce(\n      (sum, product) => sum + product.stock,\n      0,\n    );\n\n    const inventoryValue = activeProducts.reduce(\n      (sum, product) => sum + product.stock * Number(product.purchasePrice || 0),\n      0,\n    );")
+          replace_once('src/features/products/ProductsPage.tsx',
+              '      total: products.length,',
+              '      total: activeProducts.length,')
+          replace_once('src/features/products/ProductsPage.tsx',
+              "      id: string; data: CreateProductRequest }) =>\n      updateProduct(id, data),",
+              "      id: string; data: UpdateProductRequest }) =>\n      updateProduct(id, data),")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  const deleteProductMutation = useMutation({\n    mutationFn: deleteProduct,\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: [\"products\"] });\n    },\n    onError: (mutationError) => {\n      alert(getErrorMessage(mutationError));\n    },\n  });",
+              "  const productStatusMutation = useMutation({\n    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>\n      active ? reactivateProduct(id, reason) : deactivateProduct(id, reason),\n    onSuccess: () => {\n      queryClient.invalidateQueries({ queryKey: [\"products\"] });\n    },\n    onError: (mutationError) => alert(getErrorMessage(mutationError)),\n  });")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  const handleDeleteProduct = (product: Product) => {\n    const confirmed = window.confirm(\n      `¿Seguro que deseas eliminar el producto \"${product.name}\"?`,\n    );\n\n    if (!confirmed) return;\n\n    deleteProductMutation.mutate(product.id);\n  };",
+              "  const handleToggleProduct = (product: Product) => {\n    const active = product.isActive === false;\n    const action = active ? 'reactivar' : 'desactivar';\n    const reason = requestEconomicReason(`${action} el producto ${product.name}`);\n    if (!reason) return;\n    productStatusMutation.mutate({ id: product.id, active, reason });\n  };")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  const handleSubmitProduct = (data: CreateProductRequest) => {\n    if (selectedProduct) {\n      updateProductMutation.mutate({\n        id: selectedProduct.id,\n        data,\n      });\n      return;\n    }",
+              "  const handleSubmitProduct = (data: CreateProductRequest) => {\n    if (selectedProduct) {\n      const priceFields: Array<keyof CreateProductRequest> = [\n        'purchasePrice', 'priceNormal', 'priceCamino', 'priceEspecial', 'priceMayorista',\n      ];\n      const changedPrices = priceFields.some((field) =>\n        data[field] !== undefined && Number(data[field]) !== Number(selectedProduct[field as keyof Product]),\n      );\n      const changeReason = changedPrices\n        ? requestEconomicReason(`cambiar precios del producto ${selectedProduct.name}`)\n        : undefined;\n      if (changedPrices && !changeReason) return;\n      updateProductMutation.mutate({\n        id: selectedProduct.id,\n        data: { ...data, changeReason },\n      });\n      return;\n    }")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  const productLoading =\n    createProductMutation.isPending || updateProductMutation.isPending;",
+              "  const productLoading =\n    createProductMutation.isPending || updateProductMutation.isPending || productStatusMutation.isPending;")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "    providersLoading ||",
+              "    (isAdmin && providersLoading) ||")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "  if (providersIsError)\n    return <ErrorMessage message={getErrorMessage(providersError)} />;",
+              "  if (isAdmin && providersIsError)\n    return <ErrorMessage message={getErrorMessage(providersError)} />;")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "        <Card sx={{ p: 2.5 }}>\n          <Typography variant=\"caption\" fontWeight={800} color=\"text.secondary\">\n            VALOR INVENTARIO",
+              "        {isAdmin && <Card sx={{ p: 2.5 }}>\n          <Typography variant=\"caption\" fontWeight={800} color=\"text.secondary\">\n            VALOR INVENTARIO")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "          </Typography>\n        </Card>\n      </Box>\n\n      {!isAdmin && (",
+              "          </Typography>\n        </Card>}\n      </Box>\n\n      {!isAdmin && (")
+          replace_once('src/features/products/ProductsPage.tsx',
+              '                    sx={{ "& td": { borderColor: "#edf0f2" } }}',
+              '                    sx={{ opacity: product.isActive === false ? 0.6 : 1, "& td": { borderColor: "#edf0f2" } }}')
+          replace_once('src/features/products/ProductsPage.tsx',
+              "                          <Typography fontWeight={800}>\n                            {product.name}\n                          </Typography>",
+              "                          <Stack direction=\"row\" spacing={1} alignItems=\"center\">\n                            <Typography fontWeight={800}>{product.name}</Typography>\n                            <Chip size=\"small\" label={product.isActive === false ? 'Inactivo' : 'Activo'} color={product.isActive === false ? 'default' : 'success'} variant=\"outlined\" />\n                          </Stack>")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "                              onClick={() => handleEditProduct(product)}",
+              "                              disabled={product.isActive === false}\n                              onClick={() => handleEditProduct(product)}")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "                          <Tooltip title=\"Eliminar\">\n                            <IconButton\n                              size=\"small\"\n                              color=\"error\"\n                              disabled={deleteProductMutation.isPending}\n                              onClick={() => handleDeleteProduct(product)}\n                            >\n                              <DeleteIcon fontSize=\"small\" />\n                            </IconButton>\n                          </Tooltip>",
+              "                          <Tooltip title={product.isActive === false ? 'Reactivar' : 'Desactivar'}>\n                            <IconButton\n                              size=\"small\"\n                              color={product.isActive === false ? 'success' : 'error'}\n                              disabled={productStatusMutation.isPending}\n                              onClick={() => handleToggleProduct(product)}\n                            >\n                              {product.isActive === false ? <RestoreIcon fontSize=\"small\" /> : <DeleteIcon fontSize=\"small\" />}\n                            </IconButton>\n                          </Tooltip>")
+          replace_once('src/features/products/ProductsPage.tsx',
+              "        providers={providers}",
+              "        providers={providers.filter((provider) => provider.isActive !== false)}")
+
+          # Reports page
+          replace_once('src/features/reports/ReportsPage.tsx',
+              'import { ErrorMessage } from "../../components/common/ErrorMessage";',
+              'import { ErrorMessage } from "../../components/common/ErrorMessage";\nimport { downloadProtectedDocument } from "../../api/documents.api";')
+          reports_page = Path('src/features/reports/ReportsPage.tsx').read_text(encoding='utf-8')
+          start = reports_page.index('function openPdf(')
+          end = reports_page.index('\nfunction MetricCard', start)
+          reports_page = reports_page[:start] + reports_page[end+1:]
+          reports_page = reports_page.replace(
+              '    onSuccess: (result) => openPdf(result.pdfUrl),',
+              '    onSuccess: (result) => {\n      void downloadProtectedDocument(result.pdfUrl, `${activeKey || "reporte"}.pdf`);\n    },',
+          )
+          reports_page = reports_page.replace(
+              '    onSuccess: (result) => openPdf(result.pdfUrl),',
+              '    onSuccess: (result) => {\n      void downloadProtectedDocument(result.pdfUrl, "reporte-matriz-ventas.pdf");\n    },',
+              1,
+          )
+          Path('src/features/reports/ReportsPage.tsx').write_text(reports_page, encoding='utf-8')
+
+          # Sales protected download
+          replace_once('src/features/sales/SalesPage.tsx',
+              "import { getClients } from '../../api/clients.api';",
+              "import { getClients } from '../../api/clients.api';\nimport { downloadProtectedDocument } from '../../api/documents.api';")
+          sales_page = Path('src/features/sales/SalesPage.tsx').read_text(encoding='utf-8')
+          start = sales_page.index('function getDocumentUrl(')
+          end = sales_page.index('\nfunction isInsideDateRange', start)
+          sales_page = sales_page[:start] + sales_page[end+1:]
+          marker = "  const whatsAppMutation = useMutation({"
+          document_mutation = "  const documentMutation = useMutation({\n    mutationFn: ({ url, filename }: { url: string; filename: string }) =>\n      downloadProtectedDocument(url, filename),\n    onError: (mutationError) => setActionError(getErrorMessage(mutationError)),\n  });\n\n"
+          sales_page = sales_page.replace(marker, document_mutation + marker, 1)
+          old_button = '''                            <Tooltip title="Abrir recibo">
+                              <IconButton
+                                size="small"
+                                component="a"
+                                href={getDocumentUrl(
+                                  documentUrl,
+                                )}
+                                target="_blank"
+                              >
+                                <FileDownloadIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>'''
+          new_button = '''                            <Tooltip title="Descargar recibo protegido">
+                              <IconButton
+                                size="small"
+                                disabled={documentMutation.isPending}
+                                onClick={() => documentMutation.mutate({
+                                  url: documentUrl,
+                                  filename: `nota-venta-${sale.saleNumber}.pdf`,
+                                })}
+                              >
+                                <FileDownloadIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>'''
+          if old_button not in sales_page:
+              raise SystemExit('No se encontró botón PDF de ventas')
+          sales_page = sales_page.replace(old_button, new_button, 1)
+          Path('src/features/sales/SalesPage.tsx').write_text(sales_page, encoding='utf-8')
+
+          # Purchases protected download
+          replace_once('src/features/purchases/PurchasesPage.tsx',
+              "import { getProviders } from '../../api/providers.api';",
+              "import { getProviders } from '../../api/providers.api';\nimport { downloadProtectedDocument } from '../../api/documents.api';")
+          purchases_page = Path('src/features/purchases/PurchasesPage.tsx').read_text(encoding='utf-8')
+          start = purchases_page.index('function getPdfUrl(')
+          end = purchases_page.index('\nfunction getPurchaseGroups', start)
+          purchases_page = purchases_page[:start] + purchases_page[end+1:]
+          marker = "  const handleCreatePurchase = () => {"
+          document_mutation = "  const documentMutation = useMutation({\n    mutationFn: ({ url, filename }: { url: string; filename: string }) =>\n      downloadProtectedDocument(url, filename),\n    onError: (mutationError) => setActionError(getErrorMessage(mutationError)),\n  });\n\n"
+          purchases_page = purchases_page.replace(marker, document_mutation + marker, 1)
+          old_button = '''                          <Tooltip title="Abrir comprobante PDF">
+                            <IconButton
+                              size="small"
+                              component="a"
+                              href={getPdfUrl(
+                                purchase.pdfUrl,
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <FileDownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>'''
+          new_button = '''                          <Tooltip title="Descargar comprobante protegido">
+                            <IconButton
+                              size="small"
+                              disabled={documentMutation.isPending}
+                              onClick={() => documentMutation.mutate({
+                                url: purchase.pdfUrl!,
+                                filename: `comprobante-compra-${purchase.id.slice(0, 8)}.pdf`,
+                              })}
+                            >
+                              <FileDownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>'''
+          if old_button not in purchases_page:
+              raise SystemExit('No se encontró botón PDF de compras')
+          purchases_page = purchases_page.replace(old_button, new_button, 1)
+          Path('src/features/purchases/PurchasesPage.tsx').write_text(purchases_page, encoding='utf-8')
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Commit frontend Phase 3
+        run: |
+          git config user.name "chatgpt-codex-connector[bot]"
+          git config user.email "199175422+chatgpt-codex-connector[bot]@users.noreply.github.com"
+          git add src
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Implementa interfaz de protección de datos en Fase 3"
+          git push origin HEAD:${{ github.head_ref }}
