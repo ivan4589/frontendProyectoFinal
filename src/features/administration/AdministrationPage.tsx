@@ -43,7 +43,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import {
   createSystemUser,
   getSystemUserSessions,

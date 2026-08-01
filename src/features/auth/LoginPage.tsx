@@ -19,7 +19,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 
 interface LoginFormValues {

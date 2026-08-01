@@ -48,7 +48,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 
 import { getProviders } from '../../api/providers.api';
 import { downloadProtectedDocument } from '../../api/documents.api';

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { MainLayout } from '../components/layout/MainLayout';
 import { AdministrationPage } from '../features/administration/AdministrationPage';
 import { RegistrationRequestsPage } from '../features/administration/RegistrationRequestsPage';
