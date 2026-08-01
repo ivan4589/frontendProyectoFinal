@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm audit fix
+      - run: npm ci
+      - name: Install secure React Router release
+        run: npm install react-router-dom@7.11.0 --save-exact
       - run: npm run build
       - name: Reject public sensitive document links
         run: |
@@ -44,5 +46,5 @@ jobs:
           git config user.name "chatgpt-codex-connector[bot]"
           git config user.email "199175422+chatgpt-codex-connector[bot]@users.noreply.github.com"
           git add package.json package-lock.json
-          git commit -m "Actualiza dependencias vulnerables del frontend"
+          git commit -m "Fija versión segura de React Router"
           git push origin HEAD:${{ github.head_ref }}
