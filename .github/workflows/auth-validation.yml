@@ -45,6 +45,14 @@ jobs:
                   line[10:] if line.startswith('          ') else line
                   for line in raw.splitlines()
               )
+              script = script.replace(
+                  '"      id: string; data: CreateProductRequest }) =>\\n      updateProduct(id, data),"',
+                  '"mutationFn: ({ id, data }: { id: string; data: CreateProductRequest }) =>\\n      updateProduct(id, data),"',
+              )
+              script = script.replace(
+                  '"      id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
+                  '"mutationFn: ({ id, data }: { id: string; data: UpdateProductRequest }) =>\\n      updateProduct(id, data),"',
+              )
               exec(compile(script, 'phase3_frontend.py', 'exec'))
           PY
       - run: npm ci
