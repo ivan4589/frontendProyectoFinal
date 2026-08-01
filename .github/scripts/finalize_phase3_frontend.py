@@ -4,7 +4,7 @@ from pathlib import Path
 def replace_once(path: str, old: str, new: str) -> None:
     target = Path(path)
     text = target.read_text(encoding='utf-8')
-    if new in text:
+    if new and new in text:
         return
     if old not in text:
         raise RuntimeError(f'No se encontró el bloque esperado en {path}')
