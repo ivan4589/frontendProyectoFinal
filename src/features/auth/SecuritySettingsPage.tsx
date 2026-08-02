@@ -14,7 +14,7 @@ import {
 import DevicesIcon from '@mui/icons-material/Devices';
 import KeyIcon from '@mui/icons-material/Key';
 import PasswordIcon from '@mui/icons-material/Password';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import {
   changePassword,
   getSessions,

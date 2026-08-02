@@ -31,6 +31,7 @@ import {
   getCentralInventory,
 } from '../../api/inventory.api';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
+import { downloadProtectedDocument } from '../../api/documents.api';
 import { Loading } from '../../components/common/Loading';
 import { useAuth } from '../auth/AuthContext';
 import { requestEconomicReason, requestInventoryQuantityChange } from '../../utils/economicOperation';
@@ -62,23 +63,6 @@ function formatQuantity(value: number) {
   }).format(value);
 }
 
-function openPdf(pdfUrl: string) {
-  const absoluteUrl =
-    pdfUrl.startsWith('http://') ||
-    pdfUrl.startsWith('https://')
-      ? pdfUrl
-      : `${
-          import.meta.env.VITE_API_URL ||
-          'http://localhost:3000'
-        }${pdfUrl}`;
-
-  window.open(
-    absoluteUrl,
-    '_blank',
-    'noopener,noreferrer',
-  );
-}
-
 export function InventoryPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -88,8 +72,13 @@ export function InventoryPage() {
     queryFn: getCentralInventory,
   });
   const pdfMutation = useMutation({
-    mutationFn: generateCentralInventoryPdf,
-    onSuccess: (result) => openPdf(result.pdfUrl),
+    mutationFn: async () => {
+      const result = await generateCentralInventoryPdf();
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        'inventario-central.pdf',
+      );
+    },
   });
   const adjustmentMutation = useMutation({
     mutationFn: adjustInventory,

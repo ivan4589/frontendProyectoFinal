@@ -6,9 +6,7 @@ export interface Location {
   createdAt?: string;
   updatedAt?: string;
   clients?: unknown[];
-  _count?: {
-    clients?: number;
-  };
+  _count?: { clients?: number };
 }
 
 export interface Client {
@@ -17,18 +15,18 @@ export interface Client {
   alias?: string | null;
   type: ClientType;
   locationId: string;
+  locationName?: string;
   location?: Location;
   phone?: string | null;
   whatsappConsent: boolean;
   additionalInfo?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   sales?: unknown[];
   payments?: unknown[];
-  _count?: {
-    sales?: number;
-    payments?: number;
-  };
+  _count?: { sales?: number; payments?: number };
 }
 
 export interface CreateClientRequest {
@@ -41,20 +39,7 @@ export interface CreateClientRequest {
   additionalInfo?: string;
 }
 
-export interface UpdateClientRequest {
-  fullName?: string;
-  alias?: string;
-  type?: ClientType;
-  locationId?: string;
-  phone?: string;
-  whatsappConsent?: boolean;
-  additionalInfo?: string;
-}
+export interface UpdateClientRequest extends Partial<CreateClientRequest> {}
 
-export interface CreateLocationRequest {
-  name: string;
-}
-
-export interface UpdateLocationRequest {
-  name?: string;
-}
+export interface CreateLocationRequest { name: string }
+export interface UpdateLocationRequest { name?: string }

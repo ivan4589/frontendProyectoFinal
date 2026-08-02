@@ -80,4 +80,5 @@ export interface AnalyticsReportDocument {
 
 export interface ReportPdfResponse {
   pdfUrl: string;
+  historyId?: string;
 }

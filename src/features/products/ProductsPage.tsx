@@ -23,6 +23,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import CategoryIcon from "@mui/icons-material/Category";
 import DeleteIcon from "@mui/icons-material/Delete";
+import RestoreIcon from "@mui/icons-material/Restore";
 import EditIcon from "@mui/icons-material/Edit";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import ManageSearchIcon from "@mui/icons-material/ManageSearch";
@@ -31,12 +32,13 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { getProviders } from "../../api/providers.api";
 import {
   createProduct,
-  deleteProduct,
+  deactivateProduct,
   getProducts,
+  reactivateProduct,
   updateProduct,
 } from "../../api/products.api";
 import {
@@ -62,11 +64,13 @@ import type {
   CreateProductRequest,
   Product,
   SubCategory,
+  UpdateProductRequest,
 } from "../../types/product.types";
 import { ProductFormDialog } from "./ProductFormDialog";
 import { CategoriesDialog } from "./CategoriesDialog";
 import ImageIcon from "@mui/icons-material/Image";
 import { getImageUrl } from "../../utils/getImageUrl";
+import { requestEconomicReason } from "../../utils/economicOperation";
 import type {
   CreateProductFromPurchaseState,
   ReturnToPurchaseState,
@@ -220,8 +224,8 @@ export function ProductsPage() {
     isError: productsIsError,
     error: productsError,
   } = useQuery({
-    queryKey: ["products"],
-    queryFn: () => getProducts(),
+    queryKey: ["products", { includeInactive: isAdmin }],
+    queryFn: () => getProducts({ includeInactive: isAdmin }),
   });
 
   const {
@@ -230,8 +234,9 @@ export function ProductsPage() {
     isError: providersIsError,
     error: providersError,
   } = useQuery({
-    queryKey: ["providers"],
-    queryFn: getProviders,
+    queryKey: ["providers", { includeInactive: isAdmin }],
+    queryFn: () => getProviders({ includeInactive: isAdmin }),
+    enabled: isAdmin,
   });
 
   const {
@@ -292,22 +297,23 @@ export function ProductsPage() {
   ]);
 
   const summary = useMemo(() => {
-    const lowStock = products.filter(
+    const activeProducts = products.filter((product) => product.isActive !== false);
+    const lowStock = activeProducts.filter(
       (product) => product.minStock > 0 && product.stock <= product.minStock,
     ).length;
 
-    const totalStock = products.reduce(
+    const totalStock = activeProducts.reduce(
       (sum, product) => sum + product.stock,
       0,
     );
 
-    const inventoryValue = products.reduce(
-      (sum, product) => sum + product.stock * product.purchasePrice,
+    const inventoryValue = activeProducts.reduce(
+      (sum, product) => sum + product.stock * Number(product.purchasePrice || 0),
       0,
     );
 
     return {
-      total: products.length,
+      total: activeProducts.length,
       totalStock,
       lowStock,
       categories: categories.length,
@@ -344,7 +350,7 @@ export function ProductsPage() {
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CreateProductRequest }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateProductRequest }) =>
       updateProduct(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -357,14 +363,13 @@ export function ProductsPage() {
     },
   });
 
-  const deleteProductMutation = useMutation({
-    mutationFn: deleteProduct,
+  const productStatusMutation = useMutation({
+    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>
+      active ? reactivateProduct(id, reason) : deactivateProduct(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: (mutationError) => {
-      alert(getErrorMessage(mutationError));
-    },
+    onError: (mutationError) => alert(getErrorMessage(mutationError)),
   });
 
   const createCategoryMutation = useMutation({
@@ -469,21 +474,29 @@ export function ProductsPage() {
     setProductDialogOpen(true);
   };
 
-  const handleDeleteProduct = (product: Product) => {
-    const confirmed = window.confirm(
-      `¿Seguro que deseas eliminar el producto "${product.name}"?`,
-    );
-
-    if (!confirmed) return;
-
-    deleteProductMutation.mutate(product.id);
+  const handleToggleProduct = (product: Product) => {
+    const active = product.isActive === false;
+    const action = active ? 'reactivar' : 'desactivar';
+    const reason = requestEconomicReason(`${action} el producto ${product.name}`);
+    if (!reason) return;
+    productStatusMutation.mutate({ id: product.id, active, reason });
   };
 
   const handleSubmitProduct = (data: CreateProductRequest) => {
     if (selectedProduct) {
+      const priceFields: Array<keyof CreateProductRequest> = [
+        'purchasePrice', 'priceNormal', 'priceCamino', 'priceEspecial', 'priceMayorista',
+      ];
+      const changedPrices = priceFields.some((field) =>
+        data[field] !== undefined && Number(data[field]) !== Number(selectedProduct[field as keyof Product]),
+      );
+      const changeReason = changedPrices
+        ? requestEconomicReason(`cambiar precios del producto ${selectedProduct.name}`)
+        : undefined;
+      if (changedPrices && !changeReason) return;
       updateProductMutation.mutate({
         id: selectedProduct.id,
-        data,
+        data: { ...data, changeReason: changeReason || undefined },
       });
       return;
     }
@@ -500,11 +513,11 @@ export function ProductsPage() {
     deleteSubCategoryMutation.isPending;
 
   const productLoading =
-    createProductMutation.isPending || updateProductMutation.isPending;
+    createProductMutation.isPending || updateProductMutation.isPending || productStatusMutation.isPending;
 
   if (
     productsLoading ||
-    providersLoading ||
+    (isAdmin && providersLoading) ||
     categoriesLoading ||
     subCategoriesLoading
   ) {
@@ -513,7 +526,7 @@ export function ProductsPage() {
 
   if (productsIsError)
     return <ErrorMessage message={getErrorMessage(productsError)} />;
-  if (providersIsError)
+  if (isAdmin && providersIsError)
     return <ErrorMessage message={getErrorMessage(providersError)} />;
   if (categoriesIsError)
     return <ErrorMessage message={getErrorMessage(categoriesError)} />;
@@ -625,7 +638,7 @@ export function ProductsPage() {
           </Typography>
         </Card>
 
-        <Card sx={{ p: 2.5 }}>
+        {isAdmin && <Card sx={{ p: 2.5 }}>
           <Typography variant="caption" fontWeight={800} color="text.secondary">
             VALOR INVENTARIO
           </Typography>
@@ -635,7 +648,7 @@ export function ProductsPage() {
           <Typography variant="caption" color="text.secondary">
             Según costo
           </Typography>
-        </Card>
+        </Card>}
       </Box>
 
       {!isAdmin && (
@@ -783,7 +796,7 @@ export function ProductsPage() {
                   <TableRow
                     key={product.id}
                     hover
-                    sx={{ "& td": { borderColor: "#edf0f2" } }}
+                    sx={{ opacity: product.isActive === false ? 0.6 : 1, "& td": { borderColor: "#edf0f2" } }}
                   >
                     <TableCell>
                       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -819,9 +832,10 @@ export function ProductsPage() {
                         </Box>
 
                         <Box>
-                          <Typography fontWeight={800}>
-                            {product.name}
-                          </Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography fontWeight={800}>{product.name}</Typography>
+                            <Chip size="small" label={product.isActive === false ? 'Inactivo' : 'Activo'} color={product.isActive === false ? 'default' : 'success'} variant="outlined" />
+                          </Stack>
                           <Typography variant="caption" color="text.secondary">
                             {product.weight ||
                               product.unit ||
@@ -853,7 +867,9 @@ export function ProductsPage() {
                       <Stack direction="row" spacing={0.75} alignItems="center">
                         <StorefrontIcon fontSize="small" color="action" />
                         <Typography variant="body2">
-                          {getProviderName(product, providers)}
+                          {isAdmin
+                            ? getProviderName(product, providers)
+                            : 'Información restringida'}
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -917,20 +933,21 @@ export function ProductsPage() {
                           <Tooltip title="Editar">
                             <IconButton
                               size="small"
+                              disabled={product.isActive === false}
                               onClick={() => handleEditProduct(product)}
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
 
-                          <Tooltip title="Eliminar">
+                          <Tooltip title={product.isActive === false ? 'Reactivar' : 'Desactivar'}>
                             <IconButton
                               size="small"
-                              color="error"
-                              disabled={deleteProductMutation.isPending}
-                              onClick={() => handleDeleteProduct(product)}
+                              color={product.isActive === false ? 'success' : 'error'}
+                              disabled={productStatusMutation.isPending}
+                              onClick={() => handleToggleProduct(product)}
                             >
-                              <DeleteIcon fontSize="small" />
+                              {product.isActive === false ? <RestoreIcon fontSize="small" /> : <DeleteIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
                         </>
@@ -957,7 +974,7 @@ export function ProductsPage() {
       <ProductFormDialog
         open={productDialogOpen}
         product={selectedProduct}
-        providers={providers}
+        providers={providers.filter((provider) => provider.isActive !== false)}
         categories={categories}
         subCategories={subCategories}
         loading={productLoading}

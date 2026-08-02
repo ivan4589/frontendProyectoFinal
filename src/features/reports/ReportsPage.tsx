@@ -37,6 +37,7 @@ import {
   getReportCatalog,
 } from "../../api/reports.api";
 import { ErrorMessage } from "../../components/common/ErrorMessage";
+import { downloadProtectedDocument } from "../../api/documents.api";
 import { Loading } from "../../components/common/Loading";
 import type {
   AnalyticsReportCatalogItem,
@@ -128,15 +129,6 @@ function formatValue(value: unknown, format: ReportFormat = "text"): string {
   return String(value);
 }
 
-function openPdf(pdfUrl: string) {
-  const absoluteUrl =
-    pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")
-      ? pdfUrl
-      : `${import.meta.env.VITE_API_URL || "http://localhost:3000"}${pdfUrl}`;
-
-  window.open(absoluteUrl, "_blank", "noopener,noreferrer");
-}
-
 function MetricCard({ metric }: { metric: ReportMetric }) {
   return (
     <Card variant="outlined">
@@ -206,13 +198,23 @@ export function ReportsPage() {
   });
 
   const pdfMutation = useMutation({
-    mutationFn: () => generateAnalyticsReportPdf(activeKey!, requestFilters),
-    onSuccess: (result) => openPdf(result.pdfUrl),
+    mutationFn: async () => {
+      const result = await generateAnalyticsReportPdf(activeKey!, requestFilters);
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        `${activeKey || "reporte"}.pdf`,
+      );
+    },
   });
 
   const matrixPdfMutation = useMutation({
-    mutationFn: () => generateSalesMatrixPdf(requestFilters),
-    onSuccess: (result) => openPdf(result.pdfUrl),
+    mutationFn: async () => {
+      const result = await generateSalesMatrixPdf(requestFilters);
+      await downloadProtectedDocument(
+        result.pdfUrl,
+        "reporte-matriz-ventas.pdf",
+      );
+    },
   });
 
   if (catalogQuery.isLoading) {

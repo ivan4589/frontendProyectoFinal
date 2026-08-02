@@ -10,6 +10,9 @@ on:
       - 'vite.config.*'
       - '.github/workflows/auth-validation.yml'
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -22,3 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Reject public sensitive document links
+        run: |
+          if grep -R -nE "window\.open\(|/uploads/(reports|sales|purchases)" src; then
+            echo "Sensitive document links must use authenticated Blob downloads."
+            exit 1
+          fi
+      - run: npm audit --audit-level=high

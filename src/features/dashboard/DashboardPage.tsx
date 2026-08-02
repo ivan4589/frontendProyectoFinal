@@ -35,7 +35,7 @@ import {
   TrendingUp,
   WarningAmber,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import {
   Bar,
   BarChart,

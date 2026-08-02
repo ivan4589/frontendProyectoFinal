@@ -48,9 +48,10 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 
 import { getProviders } from '../../api/providers.api';
+import { downloadProtectedDocument } from '../../api/documents.api';
 import { getProducts } from '../../api/products.api';
 import { getCategories } from '../../api/categories.api';
 import { getWarehouses } from '../../api/warehouses.api';
@@ -210,24 +211,6 @@ function getStatusStyle(
   status: PurchaseStatus | PurchaseProviderStatus,
 ) {
   return statusStyles[status] || statusStyles.PENDING;
-}
-
-function getPdfUrl(pdfUrl?: string | null) {
-  if (!pdfUrl) {
-    return '';
-  }
-
-  if (
-    pdfUrl.startsWith('http://') ||
-    pdfUrl.startsWith('https://')
-  ) {
-    return pdfUrl;
-  }
-
-  const apiUrl =
-    import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-  return `${apiUrl}${pdfUrl}`;
 }
 
 function getPurchaseGroups(purchase: Purchase) {
@@ -410,7 +393,7 @@ export function PurchasesPage() {
     error: providersError,
   } = useQuery({
     queryKey: ['providers'],
-    queryFn: getProviders,
+    queryFn: () => getProviders(),
   });
 
   const {
@@ -693,6 +676,12 @@ export function PurchasesPage() {
       setActionError(getErrorMessage(mutationError));
       setConfirmAction(null);
     },
+  });
+
+  const documentMutation = useMutation({
+    mutationFn: ({ url, filename }: { url: string; filename: string }) =>
+      downloadProtectedDocument(url, filename),
+    onError: (mutationError) => setActionError(getErrorMessage(mutationError)),
   });
 
   const handleCreatePurchase = () => {
@@ -1485,19 +1474,18 @@ export function PurchasesPage() {
 
                       <TableCell align="right">
                         {purchase.pdfUrl && (
-                          <Tooltip title="Abrir comprobante PDF">
-                            <IconButton
-                              size="small"
-                              component="a"
-                              href={getPdfUrl(
-                                purchase.pdfUrl,
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <FileDownloadIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Tooltip title="Descargar comprobante protegido">
+                  <IconButton
+                    size="small"
+                    disabled={documentMutation.isPending}
+                    onClick={() => documentMutation.mutate({
+                      url: purchase.pdfUrl!,
+                      filename: `comprobante-compra-${purchase.id.slice(0, 8)}.pdf`,
+                    })}
+                  >
+                    <FileDownloadIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                         )}
 
                         {isAdmin &&

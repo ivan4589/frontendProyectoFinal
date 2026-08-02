@@ -4,15 +4,13 @@ export interface Provider {
   contactName?: string | null;
   phone?: string | null;
   email?: string | null;
+  isActive: boolean;
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
-
   products?: unknown[];
   purchases?: unknown[];
-  _count?: {
-    products?: number;
-    purchases?: number;
-  };
+  _count?: { products?: number; purchases?: number };
 }
 
 export interface CreateProviderRequest {
@@ -22,9 +20,4 @@ export interface CreateProviderRequest {
   email?: string;
 }
 
-export interface UpdateProviderRequest {
-  companyName?: string;
-  contactName?: string;
-  phone?: string;
-  email?: string;
-}
+export interface UpdateProviderRequest extends Partial<CreateProviderRequest> {}

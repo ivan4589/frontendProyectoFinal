@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RestoreIcon from '@mui/icons-material/Restore';
 import EditIcon from '@mui/icons-material/Edit';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ManageSearchIcon from '@mui/icons-material/ManageSearch';
@@ -32,8 +33,9 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createClient,
-  deleteClient,
+  deactivateClient,
   getClients,
+  reactivateClient,
   updateClient,
 } from '../../api/clients.api';
 import {
@@ -51,6 +53,7 @@ import type {
   Location,
 } from '../../types/client.types';
 import { formatDate } from '../../utils/formatDate';
+import { requestEconomicReason } from '../../utils/economicOperation';
 import { ClientFormDialog } from './ClientFormDialog';
 import { LocationsDialog } from './LocationsDialog';
 import { useAuth } from '../auth/AuthContext';
@@ -116,6 +119,7 @@ function getClientTypeColor(type: ClientType) {
 }
 
 function getLocationName(client: Client, locations: Location[]) {
+  if (client.locationName) return client.locationName;
   if (client.location?.name) return client.location.name;
 
   return locations.find((location) => location.id === client.locationId)?.name || '-';
@@ -130,6 +134,7 @@ function getSalesCount(client: Client) {
 export function ClientsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const canCreateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_CREATE);
   const canUpdateClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_UPDATE);
   const canDeleteClient = hasPermission(user?.role, PERMISSIONS.CLIENTS_DELETE);
@@ -150,8 +155,8 @@ export function ClientsPage() {
     isError: clientsIsError,
     error: clientsError,
   } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => getClients(),
+    queryKey: ['clients', { includeInactive: isAdmin }],
+    queryFn: () => getClients({ includeInactive: isAdmin }),
   });
 
   const {
@@ -189,11 +194,13 @@ export function ClientsPage() {
   }, [clients, locations, search, typeFilter, locationFilter]);
 
   const summary = useMemo(() => {
+    const activeClients = clients.filter((client) => client.isActive !== false);
+
     return {
-      total: clients.length,
-      normal: clients.filter((client) => client.type === 'NORMAL').length,
-      especial: clients.filter((client) => client.type === 'ESPECIAL').length,
-      camino: clients.filter((client) => client.type === 'CAMINO').length,
+      total: activeClients.length,
+      normal: activeClients.filter((client) => client.type === 'NORMAL').length,
+      especial: activeClients.filter((client) => client.type === 'ESPECIAL').length,
+      camino: activeClients.filter((client) => client.type === 'CAMINO').length,
       locations: locations.length,
     };
   }, [clients, locations]);
@@ -225,8 +232,9 @@ export function ClientsPage() {
     },
   });
 
-  const deleteClientMutation = useMutation({
-    mutationFn: deleteClient,
+  const clientStatusMutation = useMutation({
+    mutationFn: ({ id, active, reason }: { id: string; active: boolean; reason: string }) =>
+      active ? reactivateClient(id, reason) : deactivateClient(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
@@ -283,14 +291,12 @@ export function ClientsPage() {
     setClientDialogOpen(true);
   };
 
-  const handleDeleteClient = (client: Client) => {
-    const confirmed = window.confirm(
-      `¿Seguro que deseas eliminar el cliente "${client.fullName}"?`,
-    );
-
-    if (!confirmed) return;
-
-    deleteClientMutation.mutate(client.id);
+  const handleToggleClient = (client: Client) => {
+    const active = client.isActive === false;
+    const action = active ? 'reactivar' : 'desactivar';
+    const reason = requestEconomicReason(`${action} al cliente ${client.fullName}`);
+    if (!reason) return;
+    clientStatusMutation.mutate({ id: client.id, active, reason });
   };
 
   const handleSubmitClient = (data: CreateClientRequest) => {
@@ -571,9 +577,8 @@ export function ClientsPage() {
                     key={client.id}
                     hover
                     sx={{
-                      '& td': {
-                        borderColor: '#edf0f2',
-                      },
+                      opacity: client.isActive === false ? 0.6 : 1,
+                      '& td': { borderColor: '#edf0f2' },
                     }}
                   >
                     <TableCell>
@@ -593,7 +598,10 @@ export function ClientsPage() {
                         </Avatar>
 
                         <Box>
-                          <Typography fontWeight={800}>{client.fullName}</Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography fontWeight={800}>{client.fullName}</Typography>
+                            <Chip size="small" label={client.isActive === false ? 'Inactivo' : 'Activo'} color={client.isActive === false ? 'default' : 'success'} variant="outlined" />
+                          </Stack>
                           <Typography variant="caption" color="text.secondary">
                             {client.alias || `ID: ${client.id.slice(0, 8)}`}
                           </Typography>
@@ -652,21 +660,21 @@ export function ClientsPage() {
                     <TableCell align="right">
                       {canUpdateClient && (
                         <Tooltip title="Editar">
-                          <IconButton size="small" onClick={() => handleEditClient(client)}>
+                          <IconButton size="small" disabled={client.isActive === false} onClick={() => handleEditClient(client)}>
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
 
                       {canDeleteClient && (
-                        <Tooltip title="Eliminar">
+                        <Tooltip title={client.isActive === false ? 'Reactivar' : 'Desactivar'}>
                           <IconButton
                             size="small"
-                            color="error"
-                            disabled={deleteClientMutation.isPending}
-                            onClick={() => handleDeleteClient(client)}
+                            color={client.isActive === false ? 'success' : 'error'}
+                            disabled={clientStatusMutation.isPending}
+                            onClick={() => handleToggleClient(client)}
                           >
-                            <DeleteIcon fontSize="small" />
+                            {client.isActive === false ? <RestoreIcon fontSize="small" /> : <DeleteIcon fontSize="small" />}
                           </IconButton>
                         </Tooltip>
                       )}
