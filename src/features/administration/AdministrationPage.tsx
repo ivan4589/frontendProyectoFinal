@@ -39,6 +39,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import PasswordIcon from '@mui/icons-material/Password';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SearchIcon from '@mui/icons-material/Search';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useMemo, useState } from 'react';
@@ -50,6 +51,7 @@ import {
   getSystemUsers,
   getUserAdministrationLog,
   resetSystemUserPassword,
+  removeSystemUser,
   resetSystemUserTwoFactor,
   revokeSystemUserSessions,
   unlockSystemUser,
@@ -85,7 +87,8 @@ type SensitiveAction =
   | { kind: 'password'; user: SystemUser }
   | { kind: 'unlock'; user: SystemUser }
   | { kind: 'reset2fa'; user: SystemUser }
-  | { kind: 'sessions'; user: SystemUser };
+  | { kind: 'sessions'; user: SystemUser }
+  | { kind: 'remove'; user: SystemUser };
 
 const roleLabels: Record<UserRole, string> = {
   ADMIN: 'Administrador',
@@ -108,6 +111,7 @@ const actionLabels: Record<UserAdministrationAction, string> = {
   ROLE_CHANGED: 'Cambió el rol',
   STATUS_CHANGED: 'Cambió el estado',
   PASSWORD_RESET: 'Generó una contraseña temporal',
+  USER_REMOVED: 'Retiró un usuario',
 };
 
 function getErrorMessage(error: unknown) {
@@ -214,6 +218,15 @@ function actionDescription(action: SensitiveAction) {
         description:
           'Todos los dispositivos del usuario perderán acceso inmediatamente.',
         label: 'Cerrar sesiones',
+        severity: 'error' as const,
+      };
+    case 'remove':
+      return {
+        title: 'Retirar usuario inactivo',
+        description:
+          `Se ocultará a ${action.user.name} de la lista y se cerrarán sus sesiones. ` +
+          'Sus ventas, pagos y registros de auditoría se conservarán.',
+        label: 'Retirar usuario',
         severity: 'error' as const,
       };
   }
@@ -327,6 +340,13 @@ export function AdministrationPage() {
                 sensitiveAction.user.id,
                 confirmation,
               )
+            ).message,
+          };
+        case 'remove':
+          return {
+            kind: 'message' as const,
+            message: (
+              await removeSystemUser(sensitiveAction.user.id, confirmation)
             ).message,
           };
       }
@@ -717,6 +737,22 @@ export function AdministrationPage() {
                               }
                             >
                               <PasswordIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {!systemUser.isActive && !isSelf && (
+                          <Tooltip title="Retirar usuario inactivo de la lista">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() =>
+                                setSensitiveAction({
+                                  kind: 'remove',
+                                  user: systemUser,
+                                })
+                              }
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         )}

@@ -48,6 +48,16 @@ export async function updateSystemUserStatus(
   return response.data;
 }
 
+export async function removeSystemUser(
+  id: number,
+  confirmation: AdminConfirmation,
+): Promise<{ message: string }> {
+  const response = await api.delete<{ message: string }>(`/users/${id}`, {
+    data: confirmation,
+  });
+  return response.data;
+}
+
 export async function resetSystemUserPassword(
   id: number,
   confirmation: AdminConfirmation,

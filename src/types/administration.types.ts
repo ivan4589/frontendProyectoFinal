@@ -36,6 +36,7 @@ export interface SystemUser {
   activeSessions: number;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface CreateSystemUserRequest {
@@ -78,6 +79,7 @@ export interface ManagedUserSession {
 export type UserAdministrationAction =
   | 'USER_CREATED'
   | 'USER_UPDATED'
+  | 'USER_REMOVED'
   | 'ROLE_CHANGED'
   | 'STATUS_CHANGED'
   | 'PASSWORD_RESET';
