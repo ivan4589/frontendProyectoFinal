@@ -8,6 +8,8 @@ on:
       - 'package-lock.json'
       - 'tsconfig*.json'
       - 'vite.config.*'
+      - '.env.example'
+      - 'docs/production.md'
       - '.github/workflows/auth-validation.yml'
 
 permissions:
@@ -24,6 +26,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint:production
+      - run: npm test
       - run: npm run build
       - name: Reject public sensitive document links
         run: |

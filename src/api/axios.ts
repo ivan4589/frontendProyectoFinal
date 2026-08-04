@@ -4,24 +4,21 @@ import axios, {
 } from 'axios';
 import { clearToken, getToken, saveToken } from '../features/auth/authStorage';
 import type { LoginResponse } from '../types/auth.types';
-
-const RAW_API_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const NORMALIZED_API_URL = RAW_API_URL.replace(/\/+$/, '');
-const API_URL = NORMALIZED_API_URL.endsWith('/api')
-  ? NORMALIZED_API_URL
-  : `${NORMALIZED_API_URL}/api`;
+import { environment } from '../config/environment';
+import { reportClientError } from '../monitoring/reportError';
 
 type RetriableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
 
 const refreshClient = axios.create({
-  baseURL: API_URL,
+  baseURL: environment.apiUrl,
+  timeout: 15_000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: environment.apiUrl,
+  timeout: 30_000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -98,6 +95,9 @@ function mustNotRefresh(url?: string) {
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (!config.headers['X-Request-Id']) {
+    config.headers['X-Request-Id'] = createOperationKey();
+  }
 
   if (requiresIdempotency(config) && !config.headers['Idempotency-Key']) {
     config.headers['Idempotency-Key'] = createOperationKey();
@@ -110,6 +110,15 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const request = error.config as RetriableRequest | undefined;
+    if (!error.response || error.response.status >= 500) {
+      reportClientError(error, {
+        source: 'axios',
+        requestId: String(error.response?.headers['x-request-id'] || ''),
+        status: error.response?.status,
+        method: request?.method?.toUpperCase(),
+        path: request?.url?.split('?')[0],
+      });
+    }
     if (
       error.response?.status !== 401 ||
       !request ||

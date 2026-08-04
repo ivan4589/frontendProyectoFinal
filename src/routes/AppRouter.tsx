@@ -24,6 +24,7 @@ import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { InventoryPage } from '../features/inventory/InventoryPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
+import { AccessDeniedPage } from '../features/not-found/AccessDeniedPage';
 import { ProductsPage } from '../features/products/ProductsPage';
 import { ProvidersPage } from '../features/providers/ProvidersPage';
 import { PurchasesPage } from '../features/purchases/PurchasesPage';
@@ -67,7 +68,7 @@ function RequirePermission({
   return hasAnyPermission(user?.role, permissions) ? (
     <>{children}</>
   ) : (
-    <HomeRedirect />
+    <AccessDeniedPage />
   );
 }
 
