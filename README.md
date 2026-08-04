@@ -1,5 +1,7 @@
 # React + TypeScript + Vite
 
+La configuración segura, el monitoreo y la lista de validación para producción están en [docs/production.md](docs/production.md).
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

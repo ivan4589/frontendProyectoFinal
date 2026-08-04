@@ -7,19 +7,25 @@ import App from './App';
 import { theme } from './app/theme';
 import { queryClient } from './app/queryClient';
 import { AuthProvider } from './features/auth/AuthContext';
+import { AppErrorBoundary } from './components/common/AppErrorBoundary';
+import { installGlobalErrorMonitoring } from './monitoring/reportError';
 import './index.css';
+
+installGlobalErrorMonitoring();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <BrowserRouter>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </React.StrictMode>,
 );
