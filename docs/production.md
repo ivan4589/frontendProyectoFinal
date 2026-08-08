@@ -30,6 +30,8 @@ Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 
 
 Ajustar `connect-src`, `img-src`, `font-src` y `style-src` de la política CSP a los dominios realmente usados por la aplicación. Los mapas de fuente se generan ocultos: subirlos al proveedor de monitoreo y excluirlos del artefacto público.
 
+El archivo `vercel.json` configura el fallback de React Router, caché inmutable para assets versionados y encabezados de seguridad. En Vercel se debe definir `VITE_API_URL=https://api.yungasdistribuidora.cc` y un `VITE_RELEASE` inmutable antes de construir.
+
 ## Validación previa y alertas
 
 Probar cada ruta con ADMIN, VENDEDOR y COBRADOR; confirmar que el menú y el enrutador coinciden con la matriz, y que el backend devuelve 403 aunque se invoque manualmente una ruta prohibida. Abrir dos pestañas y repetir una operación económica con la misma clave para comprobar idempotencia.
