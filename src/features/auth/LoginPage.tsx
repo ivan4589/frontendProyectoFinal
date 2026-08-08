@@ -32,7 +32,7 @@ function getErrorMessage(error: unknown) {
   const anyError = error as any;
 
   if (anyError?.code === 'ERR_NETWORK') {
-    return 'No se pudo conectar con el backend. Verifica que NestJS esté corriendo en http://localhost:3000 y que CORS esté habilitado.';
+    return 'No se pudo conectar con el servidor. Inténtalo nuevamente en unos momentos.';
   }
 
   const message = anyError?.response?.data?.message;
