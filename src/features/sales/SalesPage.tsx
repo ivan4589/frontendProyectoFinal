@@ -84,6 +84,7 @@ import type {
   PaymentStatus,
   Sale,
   SaleStatus,
+  WhatsAppSendStatus,
 } from '../../types/sale.types';
 
 import { SaleFormDialog } from './SaleFormDialog';
@@ -225,6 +226,36 @@ function getPaymentStatusStyle(
     PAID: {
       backgroundColor: '#e8f5e9',
       color: '#2e7d32',
+    },
+  };
+
+  return styles[status];
+}
+
+function getWhatsAppStatusStyle(status: WhatsAppSendStatus) {
+  const styles: Record<
+    WhatsAppSendStatus,
+    { label: string; backgroundColor: string; color: string }
+  > = {
+    SENT: {
+      label: 'WhatsApp: enviado',
+      backgroundColor: '#e3f2fd',
+      color: '#1565c0',
+    },
+    DELIVERED: {
+      label: 'WhatsApp: entregado',
+      backgroundColor: '#e8f5e9',
+      color: '#2e7d32',
+    },
+    READ: {
+      label: 'WhatsApp: leído',
+      backgroundColor: '#e0f2f1',
+      color: '#00796b',
+    },
+    FAILED: {
+      label: 'WhatsApp: fallido',
+      backgroundColor: '#ffebee',
+      color: '#c62828',
     },
   };
 
@@ -1316,6 +1347,10 @@ export function SalesPage() {
                     whatsAppMutation.variables
                       ?.saleId === sale.id;
 
+                  const whatsappStatusStyle = sale.whatsappStatus
+                    ? getWhatsAppStatusStyle(sale.whatsappStatus)
+                    : null;
+
                   return (
                     <Fragment key={sale.id}>
                       <TableRow hover>
@@ -1372,6 +1407,31 @@ export function SalesPage() {
                                 Vendedor:{' '}
                                 {sale.userName}
                               </Typography>
+
+                              {whatsappStatusStyle && (
+                                <Tooltip
+                                  title={
+                                    sale.whatsappLastError ||
+                                    (sale.whatsappLastSentAt
+                                      ? `Última actualización: ${formatDateTime(
+                                          sale.whatsappLastSentAt,
+                                        )}`
+                                      : whatsappStatusStyle.label)
+                                  }
+                                >
+                                  <Chip
+                                    size="small"
+                                    label={whatsappStatusStyle.label}
+                                    sx={{
+                                      mt: 0.75,
+                                      bgcolor:
+                                        whatsappStatusStyle.backgroundColor,
+                                      color: whatsappStatusStyle.color,
+                                      fontWeight: 700,
+                                    }}
+                                  />
+                                </Tooltip>
+                              )}
                             </Box>
                           </Stack>
                         </TableCell>
