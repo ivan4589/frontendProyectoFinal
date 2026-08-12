@@ -4,6 +4,7 @@ export type SaleStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
 export type PaymentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID';
 export type SaleType = 'CASH' | 'CREDIT';
 export type PaymentMethod = 'CASH' | 'QR' | 'BANK_TRANSFER';
+export type WhatsAppSendStatus = 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
 
 export interface SaleDetail {
   id: string;
@@ -44,6 +45,7 @@ export interface Sale {
   cancelledPdfUrl?: string | null;
   whatsappLastSentAt?: string | null;
   whatsappMessageId?: string | null;
+  whatsappStatus?: WhatsAppSendStatus | null;
   whatsappLastError?: string | null;
   details: SaleDetail[];
   createdAt?: string;
