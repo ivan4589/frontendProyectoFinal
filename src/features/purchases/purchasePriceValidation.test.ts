@@ -7,53 +7,75 @@ const validPrices = {
   priceCamino: 76,
   priceEspecial: 10,
   priceMayorista: 75,
+  minQuantityWholesale: 20,
 };
 
 describe('getSalePriceValidationError', () => {
-  it('permite que el Precio Especial sea cero', () => {
+  it('permite que los campos opcionales sean cero', () => {
     expect(
       getSalePriceValidationError({
         ...validPrices,
+        priceCamino: 0,
         priceEspecial: 0,
+        priceMayorista: 0,
+        minQuantityWholesale: 0,
       }),
     ).toBeNull();
   });
 
-  it('permite un Precio Especial mayor a cero', () => {
-    expect(getSalePriceValidationError(validPrices)).toBeNull();
-  });
-
-  it('rechaza un Precio Especial negativo', () => {
+  it('permite que los campos opcionales estén vacíos', () => {
     expect(
       getSalePriceValidationError({
         ...validPrices,
-        priceEspecial: -1,
+        priceCamino: null,
+        priceEspecial: null,
+        priceMayorista: null,
+        minQuantityWholesale: null,
       }),
-    ).toBe('El Precio Especial debe ser cero o mayor');
+    ).toBeNull();
+  });
+
+  it('mantiene el Precio Normal como obligatorio y positivo', () => {
+    expect(
+      getSalePriceValidationError({
+        ...validPrices,
+        priceNormal: 0,
+      }),
+    ).toBe('El Precio Normal debe ser mayor a cero');
   });
 
   it.each([
-    ['Normal', { priceNormal: 0 }],
-    ['Camino', { priceCamino: 0 }],
-    ['Mayorista', { priceMayorista: 0 }],
-    ['Mayorista vacío', { priceMayorista: null }],
-  ])('mantiene el Precio %s como obligatorio y positivo', (_name, price) => {
+    ['Camino', { priceCamino: -1 }],
+    ['Especial', { priceEspecial: -1 }],
+    ['Mayorista', { priceMayorista: -1 }],
+  ])('rechaza un Precio %s negativo', (_name, price) => {
     expect(
       getSalePriceValidationError({
         ...validPrices,
         ...price,
       }),
     ).toBe(
-      'Los precios Normal, Camino y Mayorista deben ser mayores a cero',
+      'Los precios Camino, Especial y Mayorista deben ser cero o mayores, o quedar vacíos',
     );
   });
 
-  it('rechaza valores no finitos', () => {
+  it('rechaza una cantidad mínima mayorista negativa o decimal', () => {
     expect(
       getSalePriceValidationError({
         ...validPrices,
-        priceEspecial: Number.NaN,
+        minQuantityWholesale: -1,
       }),
-    ).toBe('El Precio Especial debe ser cero o mayor');
+    ).toBe(
+      'La cantidad mínima mayorista debe ser un entero igual o mayor a cero, o quedar vacía',
+    );
+
+    expect(
+      getSalePriceValidationError({
+        ...validPrices,
+        minQuantityWholesale: 1.5,
+      }),
+    ).toBe(
+      'La cantidad mínima mayorista debe ser un entero igual o mayor a cero, o quedar vacía',
+    );
   });
 });
