@@ -34,6 +34,7 @@ import type {
 } from '../../types/purchase.types';
 import type { Warehouse } from '../../types/warehouse.types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { getSalePriceValidationError } from './purchasePriceValidation';
 
 interface PurchaseFormDialogProps {
   open: boolean;
@@ -59,8 +60,8 @@ export interface DraftDetail {
   quantity: number;
   unitPrice: number;
   priceNormal: number;
-  priceCamino: number;
-  priceEspecial: number;
+  priceCamino: number | null;
+  priceEspecial: number | null;
   priceMayorista: number | null;
   minQuantityWholesale: number | null;
   warehouseDistributions: Array<{
@@ -113,6 +114,14 @@ const decimalInputProps = {
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function parseOptionalNumber(value: number | '') {
+  return value === '' ? null : Number(value);
+}
+
+function roundOptionalMoney(value: number | null) {
+  return value === null ? null : roundMoney(value);
 }
 
 function calculatePrice(
@@ -267,15 +276,9 @@ export function PurchaseFormDialog({
           setPriceNormal(createdProduct.priceNormal);
           setPriceCamino(createdProduct.priceCamino);
           setPriceEspecial(createdProduct.priceEspecial);
-          setPriceMayorista(
-            createdProduct.priceMayorista ??
-              calculatePrice(
-                createdProduct.purchasePrice,
-                currentMargin,
-              ),
-          );
+          setPriceMayorista(createdProduct.priceMayorista ?? '');
           setMinQuantityWholesale(
-            createdProduct.minQuantityWholesale ?? 1,
+            createdProduct.minQuantityWholesale ?? '',
           );
         }
       }
@@ -587,15 +590,9 @@ export function PurchaseFormDialog({
     setPriceNormal(product.priceNormal);
     setPriceCamino(product.priceCamino);
     setPriceEspecial(product.priceEspecial);
-    setPriceMayorista(
-      product.priceMayorista ??
-        calculatePrice(
-          product.purchasePrice,
-          currentMargin,
-        ),
-    );
+    setPriceMayorista(product.priceMayorista ?? '');
     setMinQuantityWholesale(
-      product.minQuantityWholesale ?? 1,
+      product.minQuantityWholesale ?? '',
     );
   };
 
@@ -631,10 +628,10 @@ export function PurchaseFormDialog({
     const parsedQuantity = Number(quantity);
     const parsedPrice = Number(unitPrice);
     const parsedPriceNormal = Number(priceNormal);
-    const parsedPriceCamino = Number(priceCamino);
-    const parsedPriceEspecial = Number(priceEspecial);
-    const parsedPriceMayorista = Number(priceMayorista);
-    const parsedMinQuantityWholesale = Number(
+    const parsedPriceCamino = parseOptionalNumber(priceCamino);
+    const parsedPriceEspecial = parseOptionalNumber(priceEspecial);
+    const parsedPriceMayorista = parseOptionalNumber(priceMayorista);
+    const parsedMinQuantityWholesale = parseOptionalNumber(
       minQuantityWholesale,
     );
 
@@ -659,25 +656,16 @@ export function PurchaseFormDialog({
       return;
     }
 
-    if (
-      parsedPriceNormal <= 0 ||
-      parsedPriceCamino <= 0 ||
-      parsedPriceEspecial <= 0 ||
-      parsedPriceMayorista <= 0
-    ) {
-      setLocalError(
-        'Todos los precios de venta deben ser mayores a cero',
-      );
-      return;
-    }
+    const salePriceError = getSalePriceValidationError({
+      priceNormal: parsedPriceNormal,
+      priceCamino: parsedPriceCamino,
+      priceEspecial: parsedPriceEspecial,
+      priceMayorista: parsedPriceMayorista,
+      minQuantityWholesale: parsedMinQuantityWholesale,
+    });
 
-    if (
-      !Number.isInteger(parsedMinQuantityWholesale) ||
-      parsedMinQuantityWholesale <= 0
-    ) {
-      setLocalError(
-        'La cantidad mínima mayorista debe ser un número entero mayor a cero',
-      );
+    if (salePriceError) {
+      setLocalError(salePriceError);
       return;
     }
 
@@ -713,11 +701,9 @@ export function PurchaseFormDialog({
             ),
             unitPrice: roundMoney(parsedPrice),
             priceNormal: roundMoney(parsedPriceNormal),
-            priceCamino: roundMoney(parsedPriceCamino),
-            priceEspecial: roundMoney(parsedPriceEspecial),
-            priceMayorista: roundMoney(
-              parsedPriceMayorista,
-            ),
+            priceCamino: roundOptionalMoney(parsedPriceCamino),
+            priceEspecial: roundOptionalMoney(parsedPriceEspecial),
+            priceMayorista: roundOptionalMoney(parsedPriceMayorista),
             minQuantityWholesale:
               parsedMinQuantityWholesale,
             warehouseDistributions: [
@@ -742,9 +728,9 @@ export function PurchaseFormDialog({
           quantity: parsedQuantity,
           unitPrice: roundMoney(parsedPrice),
           priceNormal: roundMoney(parsedPriceNormal),
-          priceCamino: roundMoney(parsedPriceCamino),
-          priceEspecial: roundMoney(parsedPriceEspecial),
-          priceMayorista: roundMoney(parsedPriceMayorista),
+          priceCamino: roundOptionalMoney(parsedPriceCamino),
+          priceEspecial: roundOptionalMoney(parsedPriceEspecial),
+          priceMayorista: roundOptionalMoney(parsedPriceMayorista),
           minQuantityWholesale: parsedMinQuantityWholesale,
           warehouseDistributions: [
             {
@@ -893,16 +879,18 @@ export function PurchaseFormDialog({
           0,
         );
 
+      const salePriceError = getSalePriceValidationError({
+        priceNormal: detail.priceNormal,
+        priceCamino: detail.priceCamino,
+        priceEspecial: detail.priceEspecial,
+        priceMayorista: detail.priceMayorista,
+        minQuantityWholesale: detail.minQuantityWholesale,
+      });
+
       return (
         detail.quantity <= 0 ||
         detail.unitPrice <= 0 ||
-        detail.priceNormal <= 0 ||
-        detail.priceCamino <= 0 ||
-        detail.priceEspecial <= 0 ||
-        !detail.priceMayorista ||
-        detail.priceMayorista <= 0 ||
-        !detail.minQuantityWholesale ||
-        detail.minQuantityWholesale <= 0 ||
+        salePriceError !== null ||
         detail.warehouseDistributions.length === 0 ||
         Math.abs(distributedQuantity - detail.quantity) >
           0.000001
@@ -923,8 +911,8 @@ export function PurchaseFormDialog({
         quantity: detail.quantity,
         unitPrice: detail.unitPrice,
         priceNormal: detail.priceNormal,
-        priceCamino: detail.priceCamino,
-        priceEspecial: detail.priceEspecial,
+        priceCamino: detail.priceCamino ?? 0,
+        priceEspecial: detail.priceEspecial ?? 0,
         priceMayorista: detail.priceMayorista,
         minQuantityWholesale: detail.minQuantityWholesale,
         warehouseDistributions:
@@ -1472,7 +1460,7 @@ export function PurchaseFormDialog({
                                   field ===
                                   'minQuantityWholesale'
                                     ? {
-                                        min: 1,
+                                        min: 0,
                                         step: 1,
                                         inputMode:
                                           'numeric',
