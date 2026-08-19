@@ -34,6 +34,7 @@ import type {
 } from '../../types/purchase.types';
 import type { Warehouse } from '../../types/warehouse.types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { getSalePriceValidationError } from './purchasePriceValidation';
 
 interface PurchaseFormDialogProps {
   open: boolean;
@@ -659,15 +660,15 @@ export function PurchaseFormDialog({
       return;
     }
 
-    if (
-      parsedPriceNormal <= 0 ||
-      parsedPriceCamino <= 0 ||
-      parsedPriceEspecial <= 0 ||
-      parsedPriceMayorista <= 0
-    ) {
-      setLocalError(
-        'Todos los precios de venta deben ser mayores a cero',
-      );
+    const salePriceError = getSalePriceValidationError({
+      priceNormal: parsedPriceNormal,
+      priceCamino: parsedPriceCamino,
+      priceEspecial: parsedPriceEspecial,
+      priceMayorista: parsedPriceMayorista,
+    });
+
+    if (salePriceError) {
+      setLocalError(salePriceError);
       return;
     }
 
@@ -893,14 +894,17 @@ export function PurchaseFormDialog({
           0,
         );
 
+      const salePriceError = getSalePriceValidationError({
+        priceNormal: detail.priceNormal,
+        priceCamino: detail.priceCamino,
+        priceEspecial: detail.priceEspecial,
+        priceMayorista: detail.priceMayorista,
+      });
+
       return (
         detail.quantity <= 0 ||
         detail.unitPrice <= 0 ||
-        detail.priceNormal <= 0 ||
-        detail.priceCamino <= 0 ||
-        detail.priceEspecial <= 0 ||
-        !detail.priceMayorista ||
-        detail.priceMayorista <= 0 ||
+        salePriceError !== null ||
         !detail.minQuantityWholesale ||
         detail.minQuantityWholesale <= 0 ||
         detail.warehouseDistributions.length === 0 ||
