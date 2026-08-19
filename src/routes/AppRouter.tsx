@@ -23,6 +23,7 @@ import { ClientsPage } from '../features/clients/ClientsPage';
 import { CollectionsPage } from '../features/collections/CollectionsPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { InventoryPage } from '../features/inventory/InventoryPage';
+import { PrivacyPolicyPage } from '../features/legal/PrivacyPolicyPage';
 import { NotFoundPage } from '../features/not-found/NotFoundPage';
 import { AccessDeniedPage } from '../features/not-found/AccessDeniedPage';
 import { ProductsPage } from '../features/products/ProductsPage';
@@ -90,6 +91,7 @@ export function AppRouter() {
       <Route path="/recuperar-contrasena" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
       <Route path="/restablecer-contrasena" element={<PublicOnly><ResetPasswordPage /></PublicOnly>} />
       <Route path="/segundo-factor" element={<PublicOnly><TwoFactorPage /></PublicOnly>} />
+      <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
 
       <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
         <Route index element={<HomeRedirect />} />

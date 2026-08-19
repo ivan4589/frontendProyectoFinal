@@ -72,6 +72,9 @@ export function SecureLoginPage() {
             <Button type="submit" variant="contained" size="large" disabled={loading}>{loading ? 'Verificando...' : 'Ingresar'}</Button>
             <Button component={Link} to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Button>
             <Button component={Link} to="/registro" variant="outlined">Solicitar una cuenta</Button>
+            <Button component={Link} to="/politica-de-privacidad" color="inherit" size="small">
+              Política de privacidad
+            </Button>
           </Stack>
         </Paper>
       </Box>
