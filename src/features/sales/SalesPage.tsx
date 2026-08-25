@@ -728,6 +728,23 @@ export function SalesPage() {
     );
   };
 
+  const handleGenerateSalePdf = (
+    sale: Sale,
+  ) => {
+    const confirmed =
+      window.confirm(
+        `¿Generar nuevamente la nota PDF de la venta ${sale.saleNumber}?`,
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    confirmMutation.mutate(
+      sale.id,
+    );
+  };
+
   const handleCancelSale = (sale: Sale) => {
     const reason = requestEconomicReason(
       `anular la venta ${sale.saleNumber}`,
@@ -1517,6 +1534,29 @@ export function SalesPage() {
                         </TableCell>
 
                         <TableCell align="right">
+                          {canManageOwnSale(sale) &&
+                            sale.status ===
+                              'CONFIRMED' &&
+                            !sale.pdfUrl && (
+                              <Tooltip title="Generar nota de venta PDF">
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  disabled={
+                                    actionLoading
+                                  }
+                                  onClick={() =>
+                                    handleGenerateSalePdf(
+                                      sale,
+                                    )
+                                  }
+                                  aria-label="Generar nota de venta PDF"
+                                >
+                                  <ReceiptLongIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+
                           {documentUrl && (
                             <Tooltip title="Descargar recibo protegido">
                     <IconButton
