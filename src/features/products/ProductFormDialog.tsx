@@ -37,6 +37,7 @@ interface ProductFormDialogProps {
 }
 
 interface ProductFormValues {
+  code: string;
   name: string;
   description: string;
   providerId: string;
@@ -138,6 +139,7 @@ export function ProductFormDialog({
     formState: { errors },
   } = useForm<ProductFormValues>({
     defaultValues: {
+      code: '',
       name: '',
       description: '',
       providerId: '',
@@ -174,6 +176,7 @@ export function ProductFormDialog({
     const subCategoryId = getProductSubCategoryId(product);
 
     reset({
+      code: product?.code || '',
       name: product?.name || '',
       description: product?.description || '',
       providerId,
@@ -274,6 +277,7 @@ export function ProductFormDialog({
       }
 
       const data: CreateProductRequest = {
+        code: values.code.trim().toUpperCase() || undefined,
         name: values.name.trim(),
         description: values.description.trim() || undefined,
         providerId: values.providerId,
@@ -389,6 +393,29 @@ export function ProductFormDialog({
               gap: 2,
             }}
           >
+            <TextField
+              fullWidth
+              label="Código del producto"
+              placeholder="Se genera automáticamente si queda vacío"
+              error={Boolean(errors.code)}
+              helperText={
+                errors.code?.message ||
+                (product
+                  ? 'Identificador comercial único del producto.'
+                  : 'Opcional: el sistema generará un código único.')
+              }
+              {...register('code', {
+                maxLength: {
+                  value: 40,
+                  message: 'El código no puede superar 40 caracteres',
+                },
+                pattern: {
+                  value: /^[A-Za-z0-9-]*$/,
+                  message: 'Usa solamente letras, números y guiones',
+                },
+              })}
+            />
+
             <TextField
               fullWidth
               label="Nombre del producto"

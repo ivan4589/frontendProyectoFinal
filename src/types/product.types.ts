@@ -23,6 +23,7 @@ export interface SubCategory {
 
 export interface Product {
   id: string;
+  code: string;
   name: string;
   description?: string | null;
   providerId: string;
@@ -55,6 +56,7 @@ export interface Product {
 }
 
 export interface CreateProductRequest {
+  code?: string;
   name: string;
   description?: string;
   providerId: string;

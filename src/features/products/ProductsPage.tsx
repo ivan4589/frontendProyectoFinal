@@ -266,6 +266,7 @@ export function ProductsPage() {
       const matchesText =
         !text ||
         [
+          product.code,
           product.name,
           product.description,
           product.unit,
@@ -679,7 +680,7 @@ export function ProductsPage() {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               size="small"
-              placeholder="Buscar producto..."
+              placeholder="Buscar por código o nombre..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               InputProps={{
@@ -837,10 +838,17 @@ export function ProductsPage() {
                             <Chip size="small" label={product.isActive === false ? 'Inactivo' : 'Activo'} color={product.isActive === false ? 'default' : 'success'} variant="outlined" />
                           </Stack>
                           <Typography variant="caption" color="text.secondary">
-                            {product.weight ||
-                              product.unit ||
-                              `ID: ${product.id.slice(0, 8)}`}
+                            Código: {product.code}
                           </Typography>
+                          {(product.weight || product.unit) && (
+                            <Typography
+                              display="block"
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {product.weight || product.unit}
+                            </Typography>
+                          )}
                         </Box>
                       </Stack>
                     </TableCell>
