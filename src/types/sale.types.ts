@@ -56,6 +56,7 @@ export interface SaleDetailRequest {
   productId: string;
   quantity: number;
   unitPrice: number;
+  manualPrice?: boolean;
 }
 
 export interface CreateSaleRequest {

@@ -1066,6 +1066,8 @@ export function SaleFormDialog({
             roundMoney(
               detail.unitPrice,
             ),
+          manualPrice:
+            detail.manualPrice,
         }),
       ),
 

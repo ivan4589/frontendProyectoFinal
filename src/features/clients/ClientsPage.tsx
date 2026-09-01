@@ -21,6 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RestoreIcon from '@mui/icons-material/Restore';
 import EditIcon from '@mui/icons-material/Edit';
@@ -29,12 +30,17 @@ import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import PeopleIcon from '@mui/icons-material/People';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SearchIcon from '@mui/icons-material/Search';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createClient,
   deactivateClient,
+  downloadClientSpreadsheetTemplate,
+  exportClientsSpreadsheet,
   getClients,
+  importClientsSpreadsheet,
+  previewClientsSpreadsheet,
   reactivateClient,
   updateClient,
 } from '../../api/clients.api';
@@ -46,6 +52,7 @@ import {
 } from '../../api/locations.api';
 import { Loading } from '../../components/common/Loading';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
+import { SpreadsheetImportDialog } from '../../components/common/SpreadsheetImportDialog';
 import type {
   Client,
   ClientType,
@@ -60,7 +67,13 @@ import { useAuth } from '../auth/AuthContext';
 import { hasPermission, PERMISSIONS } from '../auth/permissions';
 
 function getErrorMessage(error: unknown) {
-  const anyError = error as any;
+  const anyError = error as {
+    response?: {
+      status?: number;
+      data?: { message?: string | string[] };
+    };
+    message?: string;
+  };
 
   const message = anyError?.response?.data?.message;
 
@@ -148,6 +161,10 @@ export function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientFormError, setClientFormError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [spreadsheetDialogOpen, setSpreadsheetDialogOpen] = useState(false);
+  const [spreadsheetMessage, setSpreadsheetMessage] = useState<string | null>(null);
+  const [spreadsheetError, setSpreadsheetError] = useState<string | null>(null);
+  const [spreadsheetExporting, setSpreadsheetExporting] = useState(false);
 
   const {
     data: clients = [],
@@ -283,6 +300,18 @@ export function ClientsPage() {
     setSelectedClient(null);
     setClientFormError(null);
     setClientDialogOpen(true);
+  };
+
+  const handleSpreadsheetExport = async () => {
+    setSpreadsheetExporting(true);
+    setSpreadsheetError(null);
+    try {
+      await exportClientsSpreadsheet();
+    } catch (exportError) {
+      setSpreadsheetError(getErrorMessage(exportError));
+    } finally {
+      setSpreadsheetExporting(false);
+    }
   };
 
   const handleEditClient = (client: Client) => {
@@ -440,6 +469,18 @@ export function ClientsPage() {
         </Card>
       </Box>
 
+      {spreadsheetMessage && (
+        <Alert severity="success" onClose={() => setSpreadsheetMessage(null)} sx={{ mb: 2 }}>
+          {spreadsheetMessage}
+        </Alert>
+      )}
+
+      {spreadsheetError && (
+        <Alert severity="error" onClose={() => setSpreadsheetError(null)} sx={{ mb: 2 }}>
+          {spreadsheetError}
+        </Alert>
+      )}
+
       <Paper sx={{ p: 2.5 }}>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -511,6 +552,29 @@ export function ClientsPage() {
                 sx={{ fontWeight: 800, textTransform: 'none' }}
               >
                 Localidades
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleSpreadsheetExport}
+                disabled={spreadsheetExporting}
+                sx={{ fontWeight: 800, textTransform: 'none' }}
+              >
+                Exportar Excel
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileIcon />}
+                onClick={() => setSpreadsheetDialogOpen(true)}
+                sx={{ fontWeight: 800, textTransform: 'none' }}
+              >
+                Importar Excel
               </Button>
             )}
 
@@ -686,6 +750,23 @@ export function ClientsPage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <SpreadsheetImportDialog
+        open={spreadsheetDialogOpen}
+        title="Importar clientes desde Excel"
+        entityLabel="los clientes"
+        onClose={() => setSpreadsheetDialogOpen(false)}
+        onDownloadTemplate={downloadClientSpreadsheetTemplate}
+        onPreview={previewClientsSpreadsheet}
+        onImport={importClientsSpreadsheet}
+        onImported={(result) => {
+          setSpreadsheetDialogOpen(false);
+          setSpreadsheetMessage(
+            `${result.message}: ${result.summary.created} nuevos, ${result.summary.updated} actualizados y ${result.summary.unchanged} sin cambios.`,
+          );
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
+        }}
+      />
 
       <ClientFormDialog
         open={clientDialogOpen}
