@@ -23,6 +23,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import CategoryIcon from "@mui/icons-material/Category";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
 import RestoreIcon from "@mui/icons-material/Restore";
 import EditIcon from "@mui/icons-material/Edit";
 import InventoryIcon from "@mui/icons-material/Inventory";
@@ -30,6 +31,7 @@ import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import SearchIcon from "@mui/icons-material/Search";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
@@ -37,7 +39,11 @@ import { getProviders } from "../../api/providers.api";
 import {
   createProduct,
   deactivateProduct,
+  downloadProductSpreadsheetTemplate,
+  exportProductsSpreadsheet,
   getProducts,
+  importProductsSpreadsheet,
+  previewProductsSpreadsheet,
   reactivateProduct,
   updateProduct,
 } from "../../api/products.api";
@@ -55,6 +61,7 @@ import {
 } from "../../api/subCategories.api";
 import { Loading } from "../../components/common/Loading";
 import { ErrorMessage } from "../../components/common/ErrorMessage";
+import { SpreadsheetImportDialog } from "../../components/common/SpreadsheetImportDialog";
 import { useAuth } from "../auth/AuthContext";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { formatDate } from "../../utils/formatDate";
@@ -77,7 +84,13 @@ import type {
 } from "../purchases/PurchaseFormDialog";
 
 function getErrorMessage(error: unknown) {
-  const anyError = error as any;
+  const anyError = error as {
+    response?: {
+      status?: number;
+      data?: { message?: string | string[]; error?: string };
+    };
+    message?: string;
+  };
   const message = anyError?.response?.data?.message;
   const errorText = anyError?.response?.data?.error;
 
@@ -181,6 +194,10 @@ export function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productFormError, setProductFormError] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [spreadsheetDialogOpen, setSpreadsheetDialogOpen] = useState(false);
+  const [spreadsheetMessage, setSpreadsheetMessage] = useState<string | null>(null);
+  const [spreadsheetError, setSpreadsheetError] = useState<string | null>(null);
+  const [spreadsheetExporting, setSpreadsheetExporting] = useState(false);
 
   useEffect(() => {
     if (
@@ -266,6 +283,7 @@ export function ProductsPage() {
       const matchesText =
         !text ||
         [
+          product.code,
           product.name,
           product.description,
           product.unit,
@@ -455,6 +473,18 @@ export function ProductsPage() {
     setSelectedProduct(null);
     setProductFormError(null);
     setProductDialogOpen(true);
+  };
+
+  const handleSpreadsheetExport = async () => {
+    setSpreadsheetExporting(true);
+    setSpreadsheetError(null);
+    try {
+      await exportProductsSpreadsheet();
+    } catch (exportError) {
+      setSpreadsheetError(getErrorMessage(exportError));
+    } finally {
+      setSpreadsheetExporting(false);
+    }
   };
 
   const handleCloseProductDialog = () => {
@@ -651,6 +681,18 @@ export function ProductsPage() {
         </Card>}
       </Box>
 
+      {spreadsheetMessage && (
+        <Alert severity="success" onClose={() => setSpreadsheetMessage(null)} sx={{ mb: 2 }}>
+          {spreadsheetMessage}
+        </Alert>
+      )}
+
+      {spreadsheetError && (
+        <Alert severity="error" onClose={() => setSpreadsheetError(null)} sx={{ mb: 2 }}>
+          {spreadsheetError}
+        </Alert>
+      )}
+
       {!isAdmin && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Tu rol permite consultar productos. La creación, edición y eliminación
@@ -679,7 +721,7 @@ export function ProductsPage() {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               size="small"
-              placeholder="Buscar producto..."
+              placeholder="Buscar por código o nombre..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               InputProps={{
@@ -722,6 +764,29 @@ export function ProductsPage() {
                 </MenuItem>
               ))}
             </TextField>
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleSpreadsheetExport}
+                disabled={spreadsheetExporting}
+                sx={{ fontWeight: 800, textTransform: "none" }}
+              >
+                Exportar Excel
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileIcon />}
+                onClick={() => setSpreadsheetDialogOpen(true)}
+                sx={{ fontWeight: 800, textTransform: "none" }}
+              >
+                Importar Excel
+              </Button>
+            )}
 
             {isAdmin && (
               <Button
@@ -837,10 +902,17 @@ export function ProductsPage() {
                             <Chip size="small" label={product.isActive === false ? 'Inactivo' : 'Activo'} color={product.isActive === false ? 'default' : 'success'} variant="outlined" />
                           </Stack>
                           <Typography variant="caption" color="text.secondary">
-                            {product.weight ||
-                              product.unit ||
-                              `ID: ${product.id.slice(0, 8)}`}
+                            Código: {product.code}
                           </Typography>
+                          {(product.weight || product.unit) && (
+                            <Typography
+                              display="block"
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {product.weight || product.unit}
+                            </Typography>
+                          )}
                         </Box>
                       </Stack>
                     </TableCell>
@@ -970,6 +1042,23 @@ export function ProductsPage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <SpreadsheetImportDialog
+        open={spreadsheetDialogOpen}
+        title="Importar productos desde Excel"
+        entityLabel="los productos"
+        onClose={() => setSpreadsheetDialogOpen(false)}
+        onDownloadTemplate={downloadProductSpreadsheetTemplate}
+        onPreview={previewProductsSpreadsheet}
+        onImport={importProductsSpreadsheet}
+        onImported={(result) => {
+          setSpreadsheetDialogOpen(false);
+          setSpreadsheetMessage(
+            `${result.message}: ${result.summary.created} nuevos, ${result.summary.updated} actualizados y ${result.summary.unchanged} sin cambios.`,
+          );
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }}
+      />
 
       <ProductFormDialog
         open={productDialogOpen}

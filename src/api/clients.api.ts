@@ -4,6 +4,11 @@ import type {
   CreateClientRequest,
   UpdateClientRequest,
 } from '../types/client.types';
+import {
+  downloadSpreadsheet,
+  importSpreadsheet,
+  previewSpreadsheet,
+} from './spreadsheets.api';
 
 function normalizeClientsResponse(data: unknown): Client[] {
   if (Array.isArray(data)) return data;
@@ -48,4 +53,23 @@ export async function deactivateClient(id: string, reason: string): Promise<Clie
 export async function reactivateClient(id: string, reason: string): Promise<Client> {
   const response = await api.patch<Client>(`/clients/${id}/reactivate`, { reason });
   return response.data;
+}
+
+export function downloadClientSpreadsheetTemplate() {
+  return downloadSpreadsheet(
+    '/clients/spreadsheet/template',
+    'plantilla-importacion-clientes.xlsx',
+  );
+}
+
+export function exportClientsSpreadsheet() {
+  return downloadSpreadsheet('/clients/spreadsheet/export', 'clientes.xlsx');
+}
+
+export function previewClientsSpreadsheet(file: File) {
+  return previewSpreadsheet('/clients/spreadsheet/preview', file);
+}
+
+export function importClientsSpreadsheet(file: File) {
+  return importSpreadsheet('/clients/spreadsheet/import', file);
 }

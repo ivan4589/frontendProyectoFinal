@@ -4,6 +4,11 @@ import type {
   Product,
   UpdateProductRequest,
 } from '../types/product.types';
+import {
+  downloadSpreadsheet,
+  importSpreadsheet,
+  previewSpreadsheet,
+} from './spreadsheets.api';
 
 function normalizeProductsResponse(data: unknown): Product[] {
   if (Array.isArray(data)) return data;
@@ -49,4 +54,23 @@ export async function deactivateProduct(id: string, reason: string): Promise<Pro
 export async function reactivateProduct(id: string, reason: string): Promise<Product> {
   const response = await api.patch<Product>(`/products/${id}/reactivate`, { reason });
   return response.data;
+}
+
+export function downloadProductSpreadsheetTemplate() {
+  return downloadSpreadsheet(
+    '/products/spreadsheet/template',
+    'plantilla-importacion-productos.xlsx',
+  );
+}
+
+export function exportProductsSpreadsheet() {
+  return downloadSpreadsheet('/products/spreadsheet/export', 'productos.xlsx');
+}
+
+export function previewProductsSpreadsheet(file: File) {
+  return previewSpreadsheet('/products/spreadsheet/preview', file);
+}
+
+export function importProductsSpreadsheet(file: File) {
+  return importSpreadsheet('/products/spreadsheet/import', file);
 }

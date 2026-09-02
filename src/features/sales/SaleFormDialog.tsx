@@ -59,6 +59,7 @@ import type {
 } from '../../types/sale.types';
 
 import { formatCurrency } from '../../utils/formatCurrency';
+import { productMatchesSearch } from './productSearch';
 
 interface SaleFormDialogProps {
   open: boolean;
@@ -1065,6 +1066,8 @@ export function SaleFormDialog({
             roundMoney(
               detail.unitPrice,
             ),
+          manualPrice:
+            detail.manualPrice,
         }),
       ),
 
@@ -1390,6 +1393,11 @@ export function SaleFormDialog({
 
             <Autocomplete
               options={availableProducts}
+              filterOptions={(options, state) =>
+                options.filter((product) =>
+                  productMatchesSearch(product, state.inputValue),
+                )
+              }
               value={selectedProduct}
               onChange={(_event, product) =>
                 handleProductChange(product)
@@ -1403,7 +1411,7 @@ export function SaleFormDialog({
                     ) || 0,
                   );
 
-                return `${product.name} — Disponible: ${available}`;
+                return `${product.code} — ${product.name} — Disponible: ${available}`;
               }}
               isOptionEqualToValue={(
                 option,
@@ -1415,7 +1423,7 @@ export function SaleFormDialog({
                 <TextField
                   {...params}
                   label="Buscar producto"
-                  placeholder="Escribe el nombre"
+                  placeholder="Escribe el código o el nombre"
                 />
               )}
             />
