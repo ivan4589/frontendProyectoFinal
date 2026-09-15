@@ -59,7 +59,7 @@ import type {
 } from '../../types/sale.types';
 
 import { formatCurrency } from '../../utils/formatCurrency';
-import { productMatchesSearch } from './productSearch';
+import { productMatchesSearch } from '../../utils/productSearch';
 
 interface SaleFormDialogProps {
   open: boolean;
