@@ -1,4 +1,4 @@
-import type { Product } from '../../types/product.types';
+import type { Product } from '../types/product.types';
 
 function normalizeSearchText(value: string): string {
   return value

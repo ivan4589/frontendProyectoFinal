@@ -34,6 +34,7 @@ import type {
 } from '../../types/purchase.types';
 import type { Warehouse } from '../../types/warehouse.types';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { productMatchesSearch } from '../../utils/productSearch';
 import { getSalePriceValidationError } from './purchasePriceValidation';
 
 interface PurchaseFormDialogProps {
@@ -1057,12 +1058,17 @@ export function PurchaseFormDialog({
 
             <Autocomplete
               options={availableProducts}
+              filterOptions={(options, state) =>
+                options.filter((product) =>
+                  productMatchesSearch(product, state.inputValue),
+                )
+              }
               value={selectedProduct}
               onChange={(_event, product) =>
                 handleProductChange(product)
               }
               getOptionLabel={(product) =>
-                `${product.name}${product.weight ? ` - ${product.weight}` : ''}`
+                `${product.code} — ${product.name}${product.weight ? ` — ${product.weight}` : ''}`
               }
               isOptionEqualToValue={(option, value) =>
                 option.id === value.id
@@ -1073,7 +1079,7 @@ export function PurchaseFormDialog({
                 <TextField
                   {...params}
                   label="Buscar producto"
-                  placeholder="Escribe el nombre"
+                  placeholder="Escribe el código o el nombre"
                 />
               )}
             />
