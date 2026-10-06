@@ -18,6 +18,7 @@ describe('matriz de permisos del frontend', () => {
 
   it('separa las capacidades económicas de vendedor y cobrador', () => {
     expect(hasPermission('VENDEDOR', PERMISSIONS.SALES_CREATE)).toBe(true);
+    expect(hasPermission('VENDEDOR', PERMISSIONS.SALES_CANCEL)).toBe(false);
     expect(hasPermission('VENDEDOR', PERMISSIONS.PAYMENTS_CREATE_ASSIGNED)).toBe(false);
     expect(
       hasAnyPermission('COBRADOR', [
@@ -26,5 +27,19 @@ describe('matriz de permisos del frontend', () => {
       ]),
     ).toBe(true);
     expect(ROLE_PERMISSIONS.COBRADOR).not.toContain(PERMISSIONS.SALES_CREATE);
+  });
+
+  it('comparte preventas sin ampliar anulaciones ni permisos del cobrador', () => {
+    for (const permission of [
+      PERMISSIONS.SALES_UPDATE_ALL,
+      PERMISSIONS.SALES_CONFIRM_ALL,
+      PERMISSIONS.SALES_WHATSAPP_ALL,
+    ]) {
+      expect(hasPermission('ADMIN', permission)).toBe(true);
+      expect(hasPermission('VENDEDOR', permission)).toBe(true);
+      expect(hasPermission('COBRADOR', permission)).toBe(false);
+    }
+    expect(hasPermission('VENDEDOR', PERMISSIONS.SALES_CANCEL)).toBe(false);
+    expect(hasPermission('VENDEDOR', PERMISSIONS.SALES_RETURN_OWN)).toBe(true);
   });
 });

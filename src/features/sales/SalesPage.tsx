@@ -305,6 +305,7 @@ export function SalesPage() {
   const canManageOwnSale = (sale: Sale) =>
     isAdmin ||
     (user?.role === 'VENDEDOR' && sale.userId === user?.id);
+  const canManageSharedSale = isAdmin || user?.role === 'VENDEDOR';
   const canViewSaleFinancials = (sale: Sale) =>
     isAdmin ||
     user?.role === 'COBRADOR' ||
@@ -1534,7 +1535,7 @@ export function SalesPage() {
                         </TableCell>
 
                         <TableCell align="right">
-                          {canManageOwnSale(sale) &&
+                          {canManageSharedSale &&
                             sale.status ===
                               'CONFIRMED' &&
                             !sale.pdfUrl && (
@@ -1572,11 +1573,11 @@ export function SalesPage() {
                   </Tooltip>
                           )}
 
-                          {canManageOwnSale(sale) &&
+                          {canManageSharedSale &&
                             sale.status ===
                               'PENDING' && (
                               <>
-                                <Tooltip title="Confirmar venta">
+                                <Tooltip title="Confirmar entrega">
                                   <IconButton
                                     size="small"
                                     color="success"
@@ -1626,7 +1627,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {canManageOwnSale(sale) &&
+                          {canManageSharedSale &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip
