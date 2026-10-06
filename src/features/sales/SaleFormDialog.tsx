@@ -558,7 +558,7 @@ export function SaleFormDialog({
           productId: detail.productId,
           quantity: detail.quantity,
           unitPrice: detail.unitPrice,
-          manualPrice: true,
+          manualPrice: isAdmin,
         }),
       ),
     );
@@ -572,7 +572,24 @@ export function SaleFormDialog({
     setLocalError(null);
     setClientDialogOpen(false);
     setClientFormError(null);
-  }, [open, sale]);
+  }, [open, sale, isAdmin]);
+
+  useEffect(() => {
+    if (!open || isAdmin) return;
+
+    setDetails((current) =>
+      current.map((detail) => {
+        const product = productMap.get(detail.productId);
+        return product
+          ? {
+              ...detail,
+              unitPrice: getAutomaticPrice(product, clientType, detail.quantity),
+              manualPrice: false,
+            }
+          : detail;
+      }),
+    );
+  }, [open, isAdmin, productMap, clientType, sale]);
 
   useEffect(() => {
     if (
@@ -1067,13 +1084,11 @@ export function SaleFormDialog({
               detail.unitPrice,
             ),
           manualPrice:
-            detail.manualPrice,
+            isAdmin && detail.manualPrice,
         }),
       ),
 
-      discount: isAdmin
-        ? numericDiscount
-        : 0,
+      ...(isAdmin ? { discount: numericDiscount } : {}),
 
       observations:
         observations.trim() ||
@@ -1466,7 +1481,7 @@ export function SaleFormDialog({
                 },
               }}
               disabled={
-                loading || !productId
+                loading || !productId || !isAdmin
               }
             />
 
@@ -1588,6 +1603,7 @@ export function SaleFormDialog({
                     size="small"
                     type="number"
                     label="Precio"
+                    disabled={loading || !isAdmin}
                     value={
                       detail.unitPrice
                     }
@@ -1604,7 +1620,7 @@ export function SaleFormDialog({
                     }}
                     InputProps={{
                       endAdornment:
-                        detail.manualPrice ? (
+                        isAdmin && detail.manualPrice ? (
                           <TooltipButton
                             onClick={() =>
                               restoreAutomaticPrice(
