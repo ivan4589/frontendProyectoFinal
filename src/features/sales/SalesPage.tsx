@@ -303,8 +303,11 @@ export function SalesPage() {
     PERMISSIONS.SALES_DOWNLOAD_ALL,
   );
   const canManageOwnSale = (sale: Sale) =>
-    isAdmin ||
-    (user?.role === 'VENDEDOR' && sale.userId === user?.id);
+    hasPermission(user?.role, PERMISSIONS.SALES_RETURN_OWN) &&
+    (isAdmin || sale.userId === user?.id);
+  const canUpdateSales = hasPermission(user?.role, PERMISSIONS.SALES_UPDATE_ALL);
+  const canConfirmSales = hasPermission(user?.role, PERMISSIONS.SALES_CONFIRM_ALL);
+  const canSendWhatsAppSales = hasPermission(user?.role, PERMISSIONS.SALES_WHATSAPP_ALL);
   const canViewSaleFinancials = (sale: Sale) =>
     isAdmin ||
     user?.role === 'COBRADOR' ||
@@ -1534,7 +1537,7 @@ export function SalesPage() {
                         </TableCell>
 
                         <TableCell align="right">
-                          {canManageOwnSale(sale) &&
+                          {canConfirmSales &&
                             sale.status ===
                               'CONFIRMED' &&
                             !sale.pdfUrl && (
@@ -1572,14 +1575,15 @@ export function SalesPage() {
                   </Tooltip>
                           )}
 
-                          {canManageOwnSale(sale) &&
+                          {(canUpdateSales || canConfirmSales) &&
                             sale.status ===
                               'PENDING' && (
                               <>
-                                <Tooltip title="Confirmar venta">
+                                {canConfirmSales && <Tooltip title="Confirmar entrega">
                                   <IconButton
                                     size="small"
                                     color="success"
+                                    aria-label="Confirmar entrega"
                                     disabled={
                                       actionLoading
                                     }
@@ -1591,11 +1595,13 @@ export function SalesPage() {
                                   >
                                     <CheckCircleIcon fontSize="small" />
                                   </IconButton>
-                                </Tooltip>
+                                </Tooltip>}
 
-                                <Tooltip title="Editar venta">
+                                {canUpdateSales && <Tooltip title="Editar venta">
                                   <IconButton
                                     size="small"
+                                    disabled={actionLoading || formLoading}
+                                    aria-label="Editar venta"
                                     onClick={() =>
                                       handleEditSale(
                                         sale,
@@ -1604,7 +1610,7 @@ export function SalesPage() {
                                   >
                                     <EditIcon fontSize="small" />
                                   </IconButton>
-                                </Tooltip>
+                                </Tooltip>}
                               </>
                             )}
 
@@ -1626,7 +1632,7 @@ export function SalesPage() {
                               </Tooltip>
                             )}
 
-                          {canManageOwnSale(sale) &&
+                          {canSendWhatsAppSales &&
                             sale.status ===
                               'CONFIRMED' && (
                               <Tooltip

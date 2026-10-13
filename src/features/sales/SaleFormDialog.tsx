@@ -24,6 +24,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -60,6 +61,7 @@ import type {
 
 import { formatCurrency } from '../../utils/formatCurrency';
 import { productMatchesSearch } from '../../utils/productSearch';
+import { getAutomaticPrice, prepareExistingDetail } from './salePricing';
 
 interface SaleFormDialogProps {
   open: boolean;
@@ -138,35 +140,6 @@ function getMaximumCreditDate() {
   );
 
   return getDateInputValue(maximumDate);
-}
-
-function getAutomaticPrice(
-  product: Product,
-  clientType: ClientType,
-  quantity: number,
-) {
-  if (
-    clientType === 'NORMAL' &&
-    product.priceMayorista !== null &&
-    product.priceMayorista !== undefined &&
-    product.minQuantityWholesale !== null &&
-    product.minQuantityWholesale !==
-      undefined &&
-    quantity >=
-      product.minQuantityWholesale
-  ) {
-    return product.priceMayorista;
-  }
-
-  if (clientType === 'CAMINO') {
-    return product.priceCamino;
-  }
-
-  if (clientType === 'ESPECIAL') {
-    return product.priceEspecial;
-  }
-
-  return product.priceNormal;
 }
 
 function getAvailableStock(
@@ -258,6 +231,10 @@ export function SaleFormDialog({
 }: SaleFormDialogProps) {
   const isAdmin =
     userRole === 'ADMIN';
+  const initializedForm = useRef<{
+    sale: Sale | null | undefined;
+    isAdmin: boolean;
+  } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -519,8 +496,14 @@ export function SaleFormDialog({
 
   useEffect(() => {
     if (!open) {
+      initializedForm.current = null;
       return;
     }
+    if (
+      initializedForm.current?.sale === sale &&
+      initializedForm.current?.isAdmin === isAdmin
+    ) return;
+    initializedForm.current = { sale, isAdmin };
 
     setClientId(sale?.clientId || '');
     setSaleModality(
@@ -554,12 +537,12 @@ export function SaleFormDialog({
 
     setDetails(
       (sale?.details || []).map(
-        (detail) => ({
-          productId: detail.productId,
-          quantity: detail.quantity,
-          unitPrice: detail.unitPrice,
-          manualPrice: true,
-        }),
+        (detail) => prepareExistingDetail(
+          detail,
+          productMap.get(detail.productId),
+          sale?.clientType ?? 'NORMAL',
+          isAdmin,
+        ),
       ),
     );
 
@@ -572,7 +555,25 @@ export function SaleFormDialog({
     setLocalError(null);
     setClientDialogOpen(false);
     setClientFormError(null);
-  }, [open, sale]);
+  }, [open, sale, isAdmin, productMap]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setDetails((current) =>
+      current.map((detail) => {
+        if (isAdmin && detail.manualPrice) return detail;
+        const product = productMap.get(detail.productId);
+        return product
+          ? {
+              ...detail,
+              unitPrice: getAutomaticPrice(product, clientType, detail.quantity),
+              manualPrice: false,
+            }
+          : detail;
+      }),
+    );
+  }, [open, isAdmin, productMap, clientType, sale]);
 
   useEffect(() => {
     if (
@@ -1067,13 +1068,11 @@ export function SaleFormDialog({
               detail.unitPrice,
             ),
           manualPrice:
-            detail.manualPrice,
+            isAdmin && detail.manualPrice,
         }),
       ),
 
-      discount: isAdmin
-        ? numericDiscount
-        : 0,
+      ...(isAdmin ? { discount: numericDiscount } : {}),
 
       observations:
         observations.trim() ||
@@ -1466,7 +1465,7 @@ export function SaleFormDialog({
                 },
               }}
               disabled={
-                loading || !productId
+                loading || !productId || !isAdmin
               }
             />
 
@@ -1588,6 +1587,7 @@ export function SaleFormDialog({
                     size="small"
                     type="number"
                     label="Precio"
+                    disabled={loading || !isAdmin}
                     value={
                       detail.unitPrice
                     }
@@ -1604,7 +1604,7 @@ export function SaleFormDialog({
                     }}
                     InputProps={{
                       endAdornment:
-                        detail.manualPrice ? (
+                        isAdmin && detail.manualPrice ? (
                           <TooltipButton
                             onClick={() =>
                               restoreAutomaticPrice(
