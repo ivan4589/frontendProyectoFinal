@@ -282,7 +282,7 @@ export function ProductFormDialog({
         description: values.description.trim() || undefined,
         providerId: values.providerId,
         categoryId: values.categoryId,
-        subCategoryId: values.subCategoryId || undefined,
+        subCategoryId: values.subCategoryId || (product ? null : undefined),
         weight: values.weight.trim() || undefined,
         purchasePrice: numberOrZero(values.purchasePrice),
         priceNormal: numberOrZero(values.priceNormal),

@@ -3,6 +3,9 @@ export interface CentralInventoryProduct {
   code: string;
   name: string;
   unit: string;
+  presentation?: string | null;
+  subCategoryId?: string | null;
+  subCategoryName?: string | null;
   stock: number;
   reservedStock: number;
   availableStock: number;
@@ -11,6 +14,16 @@ export interface CentralInventoryProduct {
 export interface CentralInventoryCategory {
   categoryId: string;
   categoryName: string;
+  products: CentralInventoryProduct[];
+  subCategories?: CentralInventorySubCategory[];
+  totalStock: number;
+  totalReservedStock: number;
+  totalAvailableStock: number;
+}
+
+export interface CentralInventorySubCategory {
+  subCategoryId: string | null;
+  subCategoryName: string;
   products: CentralInventoryProduct[];
   totalStock: number;
   totalReservedStock: number;

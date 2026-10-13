@@ -61,7 +61,7 @@ export interface CreateProductRequest {
   description?: string;
   providerId: string;
   categoryId: string;
-  subCategoryId?: string;
+  subCategoryId?: string | null;
   weight?: string;
   purchasePrice: number;
   priceNormal: number;
