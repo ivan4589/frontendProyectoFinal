@@ -11,12 +11,7 @@ import {
   Divider,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  TextField,
   Typography,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -35,6 +30,9 @@ import { downloadProtectedDocument } from '../../api/documents.api';
 import { Loading } from '../../components/common/Loading';
 import { useAuth } from '../auth/AuthContext';
 import { requestEconomicReason, requestInventoryQuantityChange } from '../../utils/economicOperation';
+import { useState } from 'react';
+import { InventorySubcategory } from './InventorySubcategory';
+import { filterInventoryProviders } from './inventoryGrouping';
 
 function getErrorMessage(error: unknown) {
   const requestError = error as {
@@ -67,6 +65,7 @@ export function InventoryPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const [search, setSearch] = useState('');
   const inventoryQuery = useQuery({
     queryKey: ['inventory', 'central'],
     queryFn: getCentralInventory,
@@ -120,6 +119,7 @@ export function InventoryPage() {
   }
 
   const inventory = inventoryQuery.data;
+  const providers = filterInventoryProviders(inventory.providers, search);
   const summaries = [
     {
       label: 'Productos',
@@ -237,7 +237,9 @@ export function InventoryPage() {
         ))}
       </Box>
 
-      {inventory.providers.length === 0 ? (
+      <TextField label="Buscar por código, producto o subcategoría" value={search}
+        onChange={event => setSearch(event.target.value)} fullWidth />
+      {providers.length === 0 ? (
         <Paper
           sx={{
             color: 'text.secondary',
@@ -249,7 +251,7 @@ export function InventoryPage() {
             sx={{ fontSize: 52, mb: 1 }}
           />
           <Typography variant="h6">
-            No hay productos con stock
+            {search ? 'No hay productos que coincidan con la búsqueda' : 'No hay productos con stock'}
           </Typography>
           <Typography>
             Solo se muestran productos con existencias
@@ -258,7 +260,7 @@ export function InventoryPage() {
         </Paper>
       ) : (
         <Stack spacing={2}>
-          {inventory.providers.map(
+          {providers.map(
             (provider) => (
               <Accordion
                 key={provider.providerId}
@@ -363,133 +365,15 @@ export function InventoryPage() {
                           </Box>
                           <Divider />
 
-                          <TableContainer>
-                            <Table size="small">
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell>
-                                    Código
-                                  </TableCell>
-                                  <TableCell>
-                                    Producto
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    Stock actual
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    Reservado
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    Disponible
-                                  </TableCell>
-                                  <TableCell align="right">Acción</TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {category.products.map(
-                                  (product) => (
-                                    <TableRow
-                                      key={
-                                        product.productId
-                                      }
-                                      hover
-                                    >
-                                      <TableCell>
-                                        <Typography
-                                          component="code"
-                                          variant="body2"
-                                        >
-                                          {product.code}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        {product.name}
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {formatQuantity(
-                                          product.stock,
-                                        )}
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {formatQuantity(
-                                          product.reservedStock,
-                                        )}
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        <Chip
-                                          color={product.availableStock > 0 ? 'success' : 'default'}
-                                          label={formatQuantity(product.availableStock)}
-                                          size="small"
-                                          variant="outlined"
-                                        />
-                                      </TableCell>
-                                      <TableCell align="right">
-                                        {isAdmin ? (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            disabled={adjustmentMutation.isPending}
-                                            onClick={() =>
-                                              handleAdjustment(
-                                                inventory.warehouse.id,
-                                                product.productId,
-                                                product.name,
-                                              )
-                                            }
-                                          >
-                                            Ajustar
-                                          </Button>
-                                        ) : '—'}
-                                      </TableCell>
-                                    </TableRow>
-                                  ),
-                                )}
-                                <TableRow
-                                  sx={{
-                                    bgcolor:
-                                      'background.default',
-                                  }}
-                                >
-                                  <TableCell
-                                    colSpan={2}
-                                    sx={{
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    Subtotal{' '}
-                                    {category.categoryName}
-                                  </TableCell>
-                                  <TableCell
-                                    align="right"
-                                    sx={{
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    {formatQuantity(
-                                      category.totalStock,
-                                    )}
-                                  </TableCell>
-                                  <TableCell
-                                    align="right"
-                                    sx={{
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    {formatQuantity(
-                                      category.totalReservedStock,
-                                    )}
-                                  </TableCell>
-                                  <TableCell
-                                    align="right"
-                                    sx={{ fontWeight: 800 }}
-                                  >
-                                    {formatQuantity(category.totalAvailableStock)}
-                                  </TableCell>
-                                  <TableCell />
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
+                          {category.subCategories!.map(group => (
+                            <InventorySubcategory key={group.subCategoryId ?? 'none'} group={group}
+                              idPrefix={provider.providerId + '-' + category.categoryId}
+                              isAdmin={isAdmin} loading={adjustmentMutation.isPending}
+                              onAdjust={(productId, name) => handleAdjustment(inventory.warehouse.id, productId, name)} />
+                          ))}
+                          <Box sx={{ px: 2, py: 1.5 }}>
+                            Subtotal {category.categoryName}: Stock actual {formatQuantity(category.totalStock)} · Reservado {formatQuantity(category.totalReservedStock)} · Disponible {formatQuantity(category.totalAvailableStock)}
+                          </Box>
                         </Paper>
                       ),
                     )}
