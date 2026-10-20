@@ -7,7 +7,7 @@ import { createBonusRule, getBonusRules, updateBonusRule } from '../../api/bonus
 export function BonusRulesPage() {
   const cache=useQueryClient();
   const rules=useQuery({queryKey:['bonus-rules'],queryFn:getBonusRules});
-  const categories=useQuery({queryKey:['subcategories'],queryFn:getSubCategories});
+  const categories=useQuery({queryKey:['subcategories'],queryFn:()=>getSubCategories()});
   const [subCategoryId,setSubCategoryId]=useState('');
   const [minimumQuantity,setMinimumQuantity]=useState(25);
   const [bonusQuantity,setBonusQuantity]=useState(1);
