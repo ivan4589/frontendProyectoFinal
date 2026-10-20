@@ -473,6 +473,7 @@ export function AdministrationPage() {
           </Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Button component={RouterLink} to="/administration/bonuses" variant="outlined">Bonificaciones</Button>
           <Button
             component={RouterLink}
             to="/administration/registration-requests"
