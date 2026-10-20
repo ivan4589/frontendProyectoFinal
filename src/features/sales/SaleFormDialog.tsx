@@ -1,5 +1,6 @@
 import {
   Alert,
+  Collapse,
   Autocomplete,
   Box,
   Button,
@@ -19,6 +20,8 @@ import {
 
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
 import {
@@ -277,6 +280,7 @@ export function SaleFormDialog({
   const [details, setDetails] =
     useState<DraftSaleDetail[]>([]);
   const [bonuses,setBonuses]=useState<BonusAllocation[]>([]);
+  const [expandedBonuses,setExpandedBonuses]=useState<Record<string,boolean>>({});
   const {data:bonusRules=[],isError:bonusRulesError}=useQuery({queryKey:['bonus-rules'],queryFn:getBonusRules,enabled:open});
 
   const [categoryId, setCategoryId] =
@@ -569,6 +573,7 @@ export function SaleFormDialog({
       ),
     );
 
+    setExpandedBonuses({});
     setBonuses((sale?.bonuses||[]).map(b=>({productId:b.productId,quantity:b.quantity-b.returnedQuantity})).filter(b=>b.quantity>0));
     setCategoryId('');
     setSubCategoryId('');
@@ -1877,13 +1882,24 @@ export function SaleFormDialog({
             </Stack>
           </Paper>
         </Box>
-      </DialogContent>
-
         {activeBonuses.map(({rule,eligible})=>{
           const categoryProducts=products.filter(p=>p.isActive&&p.subCategoryId===rule.subCategoryId);
           const given=bonuses.reduce((n,b)=>n+(categoryProducts.some(p=>p.id===b.productId)?b.quantity:0),0);
+          const expanded=expandedBonuses[rule.id]??(given!==eligible);
           return <Paper key={rule.id} variant="outlined" sx={{p:2,mb:2}}>
-            <Typography fontWeight={800} sx={{mb:1}}>Bonificación: {rule.subCategory?.name||subCategories.find(c=>c.id===rule.subCategoryId)?.name||'Subcategoría'}</Typography>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{mb:expanded?1:0}}>
+              <Box sx={{minWidth:0}}>
+                <Typography fontWeight={800}>Bonificación: {rule.subCategory?.name||subCategories.find(c=>c.id===rule.subCategoryId)?.name||'Subcategoría'}</Typography>
+                <Typography variant="caption" color={given===eligible?'success.main':'text.secondary'}>
+                  {given===eligible?`✓ ${given} de ${eligible} regalos asignados`:`Pendiente: ${given} de ${eligible} regalos asignados`}
+                </Typography>
+              </Box>
+              <Button size="small" endIcon={expanded?<ExpandLessIcon/>:<ExpandMoreIcon/>}
+                onClick={()=>setExpandedBonuses(current=>({...current,[rule.id]:!expanded}))}>
+                {expanded?'Minimizar':'Ver / editar'}
+              </Button>
+            </Stack>
+            <Collapse in={expanded} unmountOnExit>
             <Alert severity={given===eligible?'success':'info'} sx={{mb:2}}>Por cada {rule.minimumQuantity} unidades se regalan {rule.bonusQuantity}. Debes asignar {eligible} unidades. Asignadas: {given}.</Alert>
             <Stack spacing={1}>{categoryProducts.map(p=>{
               const existing=bonuses.find(b=>b.productId===p.id)?.quantity||0;
@@ -1894,11 +1910,18 @@ export function SaleFormDialog({
               return <Stack key={p.id} direction="row" alignItems="center" spacing={2}>
                 <Box sx={{flex:1}}><Typography variant="body2">{p.name}</Typography><Typography variant="caption">Disponibles para regalo: {Math.max(0,available)}</Typography></Box>
                 <TextField size="small" label="Regalo" type="number" sx={{width:110}} value={existing} disabled={loading} inputProps={{min:0,max:Math.max(0,available),step:1}}
-                  onChange={e=>{const n=Number(e.target.value);if(Number.isSafeInteger(n)&&n>=0&&n<=Math.max(0,available))setGift(p.id,n)}}/>
+                  onChange={e=>{const n=Number(e.target.value);if(Number.isSafeInteger(n)&&n>=0&&n<=Math.max(0,available)){
+                    setGift(p.id,n);
+                    const nextGiven=given-existing+n;
+                    setExpandedBonuses(current=>({...current,[rule.id]:nextGiven!==eligible}));
+                  }}}/>
               </Stack>;
             })}</Stack>
+            </Collapse>
           </Paper>;
         })}
+      </DialogContent>
+
       <DialogActions sx={{ p: 2 }}>
         <Button
           onClick={onClose}
