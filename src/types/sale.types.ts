@@ -1,3 +1,4 @@
+import type { BonusAllocation, SaleBonus } from './bonus.types';
 import type { ClientType } from './client.types';
 
 export type SaleStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
@@ -48,6 +49,7 @@ export interface Sale {
   whatsappStatus?: WhatsAppSendStatus | null;
   whatsappLastError?: string | null;
   details: SaleDetail[];
+  bonuses?: SaleBonus[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -62,6 +64,7 @@ export interface SaleDetailRequest {
 export interface CreateSaleRequest {
   clientId: string;
   details: SaleDetailRequest[];
+  bonuses?: BonusAllocation[];
   discount?: number;
   observations?: string;
   saleType: SaleType;
@@ -74,6 +77,7 @@ export interface CreateSaleRequest {
 export interface UpdateSaleRequest {
   clientId?: string;
   details?: SaleDetailRequest[];
+  bonuses?: BonusAllocation[];
   discount?: number;
   observations?: string;
   saleType?: SaleType;

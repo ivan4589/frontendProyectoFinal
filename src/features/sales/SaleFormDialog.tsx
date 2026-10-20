@@ -34,6 +34,8 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
+import { getBonusRules } from '../../api/bonuses.api';
+import type { BonusAllocation } from '../../types/bonus.types';
 import { createClient } from '../../api/clients.api';
 import { getLocations } from '../../api/locations.api';
 import { ClientFormDialog } from '../clients/ClientFormDialog';
@@ -274,6 +276,8 @@ export function SaleFormDialog({
 
   const [details, setDetails] =
     useState<DraftSaleDetail[]>([]);
+  const [bonuses,setBonuses]=useState<BonusAllocation[]>([]);
+  const {data:bonusRules=[],isError:bonusRulesError}=useQuery({queryKey:['bonus-rules'],queryFn:getBonusRules,enabled:open});
 
   const [categoryId, setCategoryId] =
     useState('');
@@ -297,6 +301,25 @@ export function SaleFormDialog({
 
   const [localError, setLocalError] =
     useState<string | null>(null);
+
+  const activeBonuses=useMemo(()=>{
+    const today=new Date();
+    return bonusRules.filter(rule=>rule.isActive &&
+      (!rule.validFrom||new Date(rule.validFrom)<=today)&&
+      (!rule.validUntil||new Date(rule.validUntil)>=today))
+      .map(rule=>({
+        rule,
+        eligible:Math.floor(details.reduce((n,d)=>n+(products.find(p=>p.id===d.productId)?.subCategoryId===rule.subCategoryId?d.quantity:0),0)/rule.minimumQuantity)*rule.bonusQuantity,
+      })).filter(v=>v.eligible>0);
+  },[bonusRules,details,products]);
+  const bonusErrors=activeBonuses.flatMap(({rule,eligible})=>{
+    const distributed=bonuses.reduce((n,b)=>n+(products.find(p=>p.id===b.productId)?.subCategoryId===rule.subCategoryId?b.quantity:0),0);
+    return distributed===eligible?[]:[`La promoción ${rule.subCategory?.name||rule.subCategoryId} requiere ${eligible} regalos; asignados ${distributed}.`];
+  });
+  const setGift=(id:string,quantity:number)=>setBonuses(previous=>{
+    const remaining=previous.filter(p=>p.productId!==id);
+    return quantity>0?[...remaining,{productId:id,quantity}]:remaining;
+  });
 
   const selectedClient = useMemo(
     () =>
@@ -546,6 +569,7 @@ export function SaleFormDialog({
       ),
     );
 
+    setBonuses((sale?.bonuses||[]).map(b=>({productId:b.productId,quantity:b.quantity-b.returnedQuantity})).filter(b=>b.quantity>0));
     setCategoryId('');
     setSubCategoryId('');
     setProductId('');
@@ -1055,8 +1079,11 @@ export function SaleFormDialog({
       return;
     }
 
+    if(bonusRulesError){setLocalError('No se pudieron consultar las reglas de bonificación');return;}
+    if(bonusErrors.length){setLocalError(bonusErrors.join(' '));return;}
     onSubmit({
       clientId,
+      bonuses,
 
       details: details.map(
         (detail) => ({
@@ -1852,6 +1879,26 @@ export function SaleFormDialog({
         </Box>
       </DialogContent>
 
+        {activeBonuses.map(({rule,eligible})=>{
+          const categoryProducts=products.filter(p=>p.isActive&&p.subCategoryId===rule.subCategoryId);
+          const given=bonuses.reduce((n,b)=>n+(categoryProducts.some(p=>p.id===b.productId)?b.quantity:0),0);
+          return <Paper key={rule.id} variant="outlined" sx={{p:2,mb:2}}>
+            <Typography fontWeight={800} sx={{mb:1}}>Bonificación: {rule.subCategory?.name||subCategories.find(c=>c.id===rule.subCategoryId)?.name||'Subcategoría'}</Typography>
+            <Alert severity={given===eligible?'success':'info'} sx={{mb:2}}>Por cada {rule.minimumQuantity} unidades se regalan {rule.bonusQuantity}. Debes asignar {eligible} unidades. Asignadas: {given}.</Alert>
+            <Stack spacing={1}>{categoryProducts.map(p=>{
+              const existing=bonuses.find(b=>b.productId===p.id)?.quantity||0;
+              const sold=details.find(d=>d.productId===p.id)?.quantity||0;
+              const previous=(sale?.details||[]).find(d=>d.productId===p.id)?.quantity||0;
+              const oldGift=(sale?.bonuses||[]).filter(b=>b.productId===p.id).reduce((n,b)=>n+b.quantity-b.returnedQuantity,0);
+              const available=getAvailableStock(p,previous+oldGift)-sold;
+              return <Stack key={p.id} direction="row" alignItems="center" spacing={2}>
+                <Box sx={{flex:1}}><Typography variant="body2">{p.name}</Typography><Typography variant="caption">Disponibles para regalo: {Math.max(0,available)}</Typography></Box>
+                <TextField size="small" label="Regalo" type="number" sx={{width:110}} value={existing} disabled={loading} inputProps={{min:0,max:Math.max(0,available),step:1}}
+                  onChange={e=>{const n=Number(e.target.value);if(Number.isSafeInteger(n)&&n>=0&&n<=Math.max(0,available))setGift(p.id,n)}}/>
+              </Stack>;
+            })}</Stack>
+          </Paper>;
+        })}
       <DialogActions sx={{ p: 2 }}>
         <Button
           onClick={onClose}

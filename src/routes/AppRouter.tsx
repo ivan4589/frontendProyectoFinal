@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { MainLayout } from '../components/layout/MainLayout';
+import { BonusRulesPage } from '../features/administration/BonusRulesPage';
 import { AdministrationPage } from '../features/administration/AdministrationPage';
 import { RegistrationRequestsPage } from '../features/administration/RegistrationRequestsPage';
 import {
@@ -107,6 +108,7 @@ export function AppRouter() {
         <Route path="reports" element={<RequirePermission permissions={[PERMISSIONS.REPORTS_FINANCIAL, PERMISSIONS.REPORTS_SALES_ALL, PERMISSIONS.REPORTS_INVENTORY]}><ReportsPage /></RequirePermission>} />
         <Route path="security" element={<RequirePermission permissions={[PERMISSIONS.SECURITY_SELF_MANAGE]}><SecuritySettingsPage /></RequirePermission>} />
         <Route path="administration" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><AdministrationPage /></RequirePermission>} />
+        <Route path="administration/bonuses" element={<RequirePermission permissions={[PERMISSIONS.SETTINGS_MANAGE]}><BonusRulesPage /></RequirePermission>} />
         <Route path="administration/registration-requests" element={<RequirePermission permissions={[PERMISSIONS.USERS_MANAGE]}><RegistrationRequestsPage /></RequirePermission>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
