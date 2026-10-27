@@ -104,3 +104,25 @@ export async function sendSaleWhatsApp(
   );
   return response.data;
 }
+
+export interface WhatsAppLog {
+  id: string;
+  phoneNumber: string;
+  status: import('../types/sale.types').WhatsAppSendStatus;
+  createdAt: string;
+  errorMessage?: string | null;
+}
+export interface RecipientResult {
+  recipient: string;
+  status: 'SENT' | 'FAILED';
+  phoneNumber?: string;
+  error?: string;
+}
+export async function getSaleWhatsAppLogs(saleId: string): Promise<WhatsAppLog[]> {
+  return (await api.get(`/sales/${saleId}/whatsapp/logs`)).data;
+}
+export async function sendSaleWhatsAppRecipient(saleId: string, recipient: string, resend: boolean): Promise<RecipientResult> {
+  const response = await api.post<{ results: RecipientResult[] }>(`/sales/${saleId}/whatsapp/recipients`, { recipients: [recipient], resend });
+  if (!response.data.results?.[0]) throw new Error('El servidor no devolvió el resultado del envío');
+  return response.data.results[0];
+}

@@ -43,3 +43,23 @@ export interface UpdateClientRequest extends Partial<CreateClientRequest> {}
 
 export interface CreateLocationRequest { name: string }
 export interface UpdateLocationRequest { name?: string }
+
+export interface ClientContact {
+  id: string;
+  clientId: string;
+  name: string;
+  relationship?: string | null;
+  phone: string;
+  phoneNormalized: string;
+  whatsappConsent: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+}
+export interface ClientContactInput {
+  name: string;
+  relationship?: string;
+  phone: string;
+  whatsappConsent: boolean;
+  isDefault: boolean;
+  isActive?: boolean;
+}

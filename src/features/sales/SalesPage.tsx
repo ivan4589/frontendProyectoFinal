@@ -59,7 +59,6 @@ import {
   createSale,
   createSaleReturn,
   getSales,
-  sendSaleWhatsApp,
   updateSale,
 } from '../../api/sales.api';
 
@@ -87,6 +86,7 @@ import type {
   WhatsAppSendStatus,
 } from '../../types/sale.types';
 
+import { WhatsAppRecipientsDialog } from './WhatsAppRecipientsDialog';
 import { SaleFormDialog } from './SaleFormDialog';
 import { SaleReturnDialog } from './SaleReturnDialog';
 
@@ -347,6 +347,7 @@ export function SalesPage() {
   const [returnOpen, setReturnOpen] =
     useState(false);
 
+  const [whatsAppSale, setWhatsAppSale] = useState<Sale | null>(null);
   const [selectedSale, setSelectedSale] =
     useState<Sale | null>(null);
 
@@ -647,35 +648,6 @@ export function SalesPage() {
     onError: (mutationError) => setActionError(getErrorMessage(mutationError)),
   });
 
-  const whatsAppMutation = useMutation({
-    mutationFn: ({
-      saleId,
-      resend,
-    }: {
-      saleId: string;
-      resend: boolean;
-    }) =>
-      sendSaleWhatsApp(
-        saleId,
-        resend,
-      ),
-
-    onSuccess: async (result) => {
-      await refreshSales();
-      setActionError(null);
-      setActionSuccess(
-        `Nota de venta enviada por WhatsApp a ${result.phoneNumber}.`,
-      );
-    },
-
-    onError: (mutationError) => {
-      setActionSuccess(null);
-      setActionError(
-        getErrorMessage(mutationError),
-      );
-    },
-  });
-
   const handleCreateSale = () => {
     setSelectedSale(null);
     setFormError(null);
@@ -765,30 +737,6 @@ export function SalesPage() {
     setReturnOpen(true);
   };
 
-  const handleSendWhatsApp = (
-    sale: Sale,
-  ) => {
-    const resend = Boolean(
-      sale.whatsappLastSentAt,
-    );
-
-    if (
-      resend &&
-      !window.confirm(
-        `La nota ${sale.saleNumber} ya fue enviada. ¿Deseas reenviarla?`,
-      )
-    ) {
-      return;
-    }
-
-    setActionError(null);
-    setActionSuccess(null);
-    whatsAppMutation.mutate({
-      saleId: sale.id,
-      resend,
-    });
-  };
-
   const hasFilters =
     Boolean(search) ||
     statusFilter !== 'ALL' ||
@@ -812,8 +760,7 @@ export function SalesPage() {
 
   const actionLoading =
     confirmMutation.isPending ||
-    cancelMutation.isPending ||
-    whatsAppMutation.isPending;
+    cancelMutation.isPending;
 
   if (
     salesLoading ||
@@ -1353,19 +1300,7 @@ export function SalesPage() {
                       : sale.pdfUrl
                     : undefined;
 
-                  const whatsappDisabledReason =
-                    !sale.clientPhone
-                      ? 'El cliente no tiene teléfono'
-                      : !sale.clientWhatsAppConsent
-                        ? 'El cliente no autorizó envíos por WhatsApp'
-                        : !sale.pdfUrl
-                          ? 'La venta no tiene un PDF disponible'
-                          : null;
-
-                  const sendingThisSale =
-                    whatsAppMutation.isPending &&
-                    whatsAppMutation.variables
-                      ?.saleId === sale.id;
+                  const whatsappDisabledReason = !sale.pdfUrl ? 'La venta no tiene un PDF disponible' : null;
 
                   const whatsappStatusStyle = sale.whatsappStatus
                     ? getWhatsAppStatusStyle(sale.whatsappStatus)
@@ -1654,9 +1589,7 @@ export function SalesPage() {
                                       actionLoading
                                     }
                                     onClick={() =>
-                                      handleSendWhatsApp(
-                                        sale,
-                                      )
+                                      setWhatsAppSale(sale)
                                     }
                                     aria-label={
                                       sale.whatsappLastSentAt
@@ -1668,9 +1601,7 @@ export function SalesPage() {
                                       fontSize="small"
                                       sx={{
                                         opacity:
-                                          sendingThisSale
-                                            ? 0.45
-                                            : 1,
+                                          1,
                                       }}
                                     />
                                   </IconButton>
@@ -1954,6 +1885,7 @@ export function SalesPage() {
         </TableContainer>
       </Paper>
 
+      {whatsAppSale && <WhatsAppRecipientsDialog sale={whatsAppSale} onClose={() => setWhatsAppSale(null)} onUpdated={() => { void refreshSales(); }} />}
       <SaleFormDialog
         open={formOpen}
         sale={selectedSale}
