@@ -61,6 +61,7 @@ import type {
 } from '../../types/client.types';
 import { formatDate } from '../../utils/formatDate';
 import { requestEconomicReason } from '../../utils/economicOperation';
+import { ClientContactsDialog } from './ClientContactsDialog';
 import { ClientFormDialog } from './ClientFormDialog';
 import { LocationsDialog } from './LocationsDialog';
 import { useAuth } from '../auth/AuthContext';
@@ -158,6 +159,7 @@ export function ClientsPage() {
   const [locationFilter, setLocationFilter] = useState('ALL');
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [locationsDialogOpen, setLocationsDialogOpen] = useState(false);
+  const [contactsClient, setContactsClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientFormError, setClientFormError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -722,6 +724,9 @@ export function ClientsPage() {
                     </TableCell>
 
                     <TableCell align="right">
+                      {isAdmin && canUpdateClient && client.isActive !== false && (
+                        <Tooltip title="Contactos de WhatsApp"><IconButton size="small" aria-label={`Contactos de WhatsApp de ${client.fullName}`} onClick={() => setContactsClient(client)}><PeopleIcon fontSize="small" /></IconButton></Tooltip>
+                      )}
                       {canUpdateClient && (
                         <Tooltip title="Editar">
                           <IconButton size="small" disabled={client.isActive === false} onClick={() => handleEditClient(client)}>
@@ -768,6 +773,7 @@ export function ClientsPage() {
         }}
       />
 
+      {contactsClient && <ClientContactsDialog client={contactsClient} onClose={() => setContactsClient(null)} />}
       <ClientFormDialog
         open={clientDialogOpen}
         client={selectedClient}

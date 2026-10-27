@@ -73,3 +73,13 @@ export function previewClientsSpreadsheet(file: File) {
 export function importClientsSpreadsheet(file: File) {
   return importSpreadsheet('/clients/spreadsheet/import', file);
 }
+
+export async function getClientContacts(clientId: string): Promise<import('../types/client.types').ClientContact[]> {
+  return (await api.get(`/clients/${clientId}/contacts`)).data;
+}
+export async function createClientContact(clientId: string, data: import('../types/client.types').ClientContactInput) {
+  return (await api.post(`/clients/${clientId}/contacts`, data)).data;
+}
+export async function updateClientContact(clientId: string, contactId: string, data: Partial<import('../types/client.types').ClientContactInput>) {
+  return (await api.patch(`/clients/${clientId}/contacts/${contactId}`, data)).data;
+}
